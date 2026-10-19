@@ -1,165 +1,212 @@
-import React, { useState } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  ScrollView, 
-  TouchableOpacity, 
-  SafeAreaView, 
-  StatusBar,
-  Modal,
-  TouchableWithoutFeedback
+import React, { useState, useCallback } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { COLORS } from '../constants/theme';
+import { getUserBooks } from '../api';
 
-export default function ArchiveScreen({navigation}) {
-  const [selectedCategory, setSelectedCategory] = useState('전체');
-  const [activeBook, setActiveBook] = useState(null);
+const TEST_USER_ID = '00000000-0000-0000-0000-000000000000';
 
-  const categories = ['전체', '소설', '시', '에세이'];
+export default function ArchiveScreen({ navigation }) {
+  const [books, setBooks] = useState([]);
+  const [filteredBooks, setFilteredBooks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('ALL'); // ALL, READING, COMPLETED, WISH
 
-  const sampleBooks = [
-    { id: 1, title: '채식주의자', author: '한강', category: '소설', year: 2007, description: '노벨문학상 수상작. 육식을 거부하는 한 여자의 이야기.' },
-    { id: 2, title: '소년이 온다', author: '한강', category: '소설', year: 2014, description: '1980년 5월 광주를 배경으로 살아남은 이들의 슬픔과 고통을 다룬 소설.' },
-    { id: 3, title: '흰', author: '한강', category: '시', year: 2016, description: '세상의 모든 흰 것에 대한 작가의 깊은 사색과 기억.' },
-    { id: 4, title: '작별하지 않는다', author: '한강', category: '소설', year: 2021, description: '제주 4·3의 비극을 지극한 사랑과 애도의 시선으로 응시하는 장편.' },
-    { id: 5, title: '아몬드', author: '손원평', category: '소설', year: 2017, description: '감정을 느끼지 못하는 소년 윤재의 특별한 성장과 우정 이야기.' },
-    { id: 6, title: '82년생 김지영', author: '조남주', category: '소설', year: 2016, description: '한국 사회를 살아가는 평범한 30대 여성의 삶을 기록한 소설.' },
-    { id: 7, title: '언어의 온도', author: '이기주', category: '에세이', year: 2016, description: '말과 글이 지닌 고유한 온도를 일상에서 포착한 따뜻한 산문집.' },
-    { id: 8, title: '광장', author: '최인훈', category: '소설', year: 1960, description: '분단 한국의 비극과 인간의 이념적 갈등을 치열하게 그려낸 고전.' },
-  ];
+  // 서재 도서 목록 조회
+  const fetchMyBooks = async () => {
+    try {
+      setLoading(true);
+      const data = await getUserBooks(TEST_USER_ID);
 
-  const displayedBooks = selectedCategory === '전체' 
-    ? sampleBooks 
-    : sampleBooks.filter(book => book.category === selectedCategory);
+      let bookList = [];
+      if (data && Array.isArray(data)) {
+        bookList = data;
+      } else if (data && data.books && Array.isArray(data.books)) {
+        bookList = data.books;
+      } else if (data && data.data && Array.isArray(data.data)) {
+        bookList = data.data;
+      }
+
+      setBooks(bookList);
+      applyFilter(bookList, selectedFilter);
+    } catch (error) {
+      console.error('서재 데이터 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 필터링 적용 함수
+  const applyFilter = (bookList, filter) => {
+    if (filter === 'ALL') {
+      setFilteredBooks(bookList);
+    } else {
+      const filtered = bookList.filter((b) => {
+        const status = (b.status || '').toUpperCase();
+        if (filter === 'READING') return status === 'READING' || status === '읽는 중';
+        if (filter === 'COMPLETED') return status === 'COMPLETED' || status === '완독' || status === 'FINISHED';
+        if (filter === 'WISH') return status === 'WISH' || status === '읽고 싶은' || status === 'WANT_TO_READ';
+        return true;
+      });
+      setFilteredBooks(filtered);
+    }
+  };
+
+  const handleFilterChange = (filterKey) => {
+    setSelectedFilter(filterKey);
+    applyFilter(books, filterKey);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyBooks();
+    }, [])
+  );
+
+  // 도서 카드 아이템 렌더링
+  const renderBookItem = ({ item }) => {
+    const rawCover = item.cover_url || item.thumbnail || item.cover_image;
+    const cover = rawCover ? rawCover.replace('http://', 'https://') : null;
+    const title = item.title || '제목 없음';
+    const author = Array.isArray(item.authors)
+      ? item.authors.join(', ')
+      : item.author || '저자 미상';
+
+    return (
+      <TouchableOpacity
+        style={styles.bookCard}
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('BookDetail', { book: item })}
+      >
+        {cover ? (
+          <Image source={{ uri: cover }} style={styles.coverImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.coverImage, styles.coverPlaceholder]}>
+            <Text style={styles.placeholderText} numberOfLines={2}>{title}</Text>
+          </View>
+        )}
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle} numberOfLines={1}>{title}</Text>
+          <Text style={styles.bookAuthor} numberOfLines={1}>{author}</Text>
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusBadgeText}>
+              {item.status === 'WISH' ? '📖 읽고 싶은' : item.status === 'COMPLETED' ? '✅ 완독' : '📚 읽는 중'}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-
+      {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.subTitle}>MINUMSA</Text>
+        <Text style={styles.subTitle}>MY ARCHIVE</Text>
         <Text style={styles.mainTitle}>모음집</Text>
-        <Text style={styles.bookCount}>민음사 도서 {displayedBooks.length}권</Text>
-
-        <View style={styles.categoryContainer}>
-          {categories.map((category) => {
-            const isSelected = selectedCategory === category;
-            return (
-              <TouchableOpacity
-                key={category}
-                style={[styles.categoryButton, isSelected && styles.categoryButtonActive]}
-                onPress={() => setSelectedCategory(category)}
-              >
-                <Text style={[styles.categoryText, isSelected && styles.categoryTextActive]}>
-                  {category}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.bookGrid} showsVerticalScrollIndicator={false}>
-        {displayedBooks.map((book) => (
-          <TouchableOpacity 
-            key={book.id} 
-            style={styles.bookCard}
-            onPress={() => setActiveBook(book)}
+      {/* 필터 칩 영역 */}
+      <View style={styles.filterContainer}>
+        {[
+          { label: '전체', key: 'ALL' },
+          { label: '📚 읽는 중', key: 'READING' },
+          { label: '✅ 완독', key: 'COMPLETED' },
+          { label: '📖 읽고 싶은', key: 'WISH' },
+        ].map((filter) => (
+          <TouchableOpacity
+            key={filter.key}
+            style={[
+              styles.filterChip,
+              selectedFilter === filter.key && styles.filterChipActive,
+            ]}
+            onPress={() => handleFilterChange(filter.key)}
           >
-            <View style={styles.bookCover}>
-              <Text style={styles.bookCoverText}>{book.title}</Text>
-            </View>
-            <Text style={styles.bookTitle} numberOfLines={1}>{book.title}</Text>
-            <Text style={styles.bookAuthor}>{book.author}</Text>
+            <Text
+              style={[
+                styles.filterText,
+                selectedFilter === filter.key && styles.filterTextActive,
+              ]}
+            >
+              {filter.label}
+            </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
 
-      <Modal
-        visible={activeBook !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setActiveBook(null)}
-      >
-        <TouchableWithoutFeedback onPress={() => setActiveBook(null)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.bottomSheet}>
-                <View style={styles.sheetHandle} />
-                {activeBook && (
-                  <>
-                    <View style={styles.sheetContent}>
-                      <View style={styles.sheetBookCover}>
-                        <Text style={styles.sheetBookCoverText}>{activeBook.title}</Text>
-                      </View>
-                      <View style={styles.sheetInfo}>
-                        <Text style={styles.sheetCategoryYear}>{activeBook.category} · {activeBook.year}</Text>
-                        <Text style={styles.sheetTitle}>{activeBook.title}</Text>
-                        <Text style={styles.sheetAuthor}>{activeBook.author}</Text>
-                        <Text style={styles.sheetDescription} numberOfLines={3}>{activeBook.description}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.sheetActionRow}>
-                      <TouchableOpacity 
-                        style={styles.sheetPrimaryButton}
-                        onPress={() => {
-                          const selected = activeBook;
-                          setActiveBook(null);
-                          navigation.navigate('BookDetail', {book: selected});
-                        }}
-                      >
-                        <Text style={styles.sheetPrimaryButtonText}>책 보러가기</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={styles.sheetBookmarkButton}
-                        onPress={() => alert(`'${activeBook.title}' 서재에 저장되었습니다.`)}
-                      >
-                        <Text style={styles.sheetBookmarkIcon}>🔖</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      {/* 리스트 영역 */}
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary || '#5C3D2E'} />
+        </View>
+      ) : filteredBooks.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyText}>해당하는 도서가 없습니다.</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredBooks}
+          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          renderItem={renderBookItem}
+          contentContainerStyle={styles.listContent}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F4EB' },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  container: { flex: 1, backgroundColor: COLORS.background || '#F7F4EB' },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   subTitle: { fontSize: 12, letterSpacing: 1.5, color: '#8C827A', fontWeight: '600' },
-  mainTitle: { fontSize: 26, fontWeight: 'bold', color: '#2B2118', marginTop: 2 },
-  bookCount: { fontSize: 13, color: '#8C827A', marginTop: 2, marginBottom: 14 },
-  categoryContainer: { flexDirection: 'row', gap: 8 },
-  categoryButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#EBE5D8' },
-  categoryButtonActive: { backgroundColor: '#2B2118' },
-  categoryText: { fontSize: 14, color: '#6E6259' },
-  categoryTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
-  bookGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, justifyContent: 'space-between', paddingBottom: 30 },
-  bookCard: { width: '31%', marginBottom: 20 },
-  bookCover: { width: '100%', aspectRatio: 1 / 1.4, backgroundColor: '#D9D0C1', borderRadius: 8, justifyContent: 'center', alignItems: 'center', padding: 6 },
-  bookCoverText: { fontSize: 12, color: '#5C5046', textAlign: 'center', fontWeight: '500' },
-  bookTitle: { fontSize: 13, fontWeight: 'bold', color: '#2B2118', marginTop: 6 },
-  bookAuthor: { fontSize: 11, color: '#8C827A', marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  bottomSheet: { backgroundColor: '#FDFBF7', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 36 },
-  sheetHandle: { width: 40, height: 4, backgroundColor: '#D1C7BD', borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
-  sheetContent: { flexDirection: 'row', marginBottom: 20 },
-  sheetBookCover: { width: 80, height: 115, backgroundColor: '#D9D0C1', borderRadius: 8, justifyContent: 'center', alignItems: 'center', padding: 6 },
-  sheetBookCoverText: { fontSize: 12, color: '#5C5046', textAlign: 'center' },
-  sheetInfo: { flex: 1, marginLeft: 16, justifyContent: 'center' },
-  sheetCategoryYear: { fontSize: 12, color: '#8C827A' },
-  sheetTitle: { fontSize: 18, fontWeight: 'bold', color: '#2B2118', marginTop: 2 },
-  sheetAuthor: { fontSize: 13, color: '#6E6259', marginTop: 2 },
-  sheetDescription: { fontSize: 12, color: '#8C827A', marginTop: 8, lineHeight: 16 },
-  sheetActionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  sheetPrimaryButton: { flex: 1, backgroundColor: '#2B2118', height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  sheetPrimaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
-  sheetBookmarkButton: { width: 48, height: 48, backgroundColor: '#EBE5D8', borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  sheetBookmarkIcon: { fontSize: 18 },
+  mainTitle: { fontSize: 24, fontWeight: 'bold', color: '#2B2118', marginTop: 4 },
+  filterContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#EBE5D8',
+  },
+  filterChipActive: { backgroundColor: '#5C3D2E' },
+  filterText: { fontSize: 12, color: '#2B2118', fontWeight: '500' },
+  filterTextActive: { color: '#FFFFFF', fontWeight: 'bold' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { fontSize: 14, color: '#8C827A' },
+  listContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  columnWrapper: { justifyContent: 'space-between', marginBottom: 16 },
+  bookCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+  },
+  coverImage: { width: '100%', height: 160, borderRadius: 8, marginBottom: 8 },
+  coverPlaceholder: { backgroundColor: '#D9D0C1', justifyContent: 'center', alignItems: 'center', padding: 8 },
+  placeholderText: { fontSize: 11, color: '#2B2118', textAlign: 'center', fontWeight: 'bold' },
+  bookInfo: { gap: 2 },
+  bookTitle: { fontSize: 13, fontWeight: 'bold', color: '#2B2118' },
+  bookAuthor: { fontSize: 11, color: '#8C827A' },
+  statusBadge: { marginTop: 4, alignSelf: 'flex-start' },
+  statusBadgeText: { fontSize: 10, color: '#5C3D2E', fontWeight: '600' },
 });
