@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // 확인된 ngrok 풀 주소 적용 (끝에 /api 추가)
-const BASE_URL = 'https://duller-bacterium-goofball.ngrok-free.dev/api';
+const BASE_URL = 'http://10.232.181.37:5000/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
