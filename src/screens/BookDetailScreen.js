@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,34 +12,53 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { addUserBook, updateUserBookStatus, deleteUserBook, getUserBooks } from '../api';
-
-const TEST_USER_ID = '00000000-0000-0000-0000-000000000000';
+import { AuthContext } from '../context/AuthContext'; // 👈 AuthContext 불러오기
 
 export default function BookDetailScreen({ route, navigation }) {
-  // 전달받은 책 정보 (검색 결과나 서재 아이템)
-  const { book } = route.params || {};
+  const { user } = useContext(AuthContext); // 👈 로그인 유저 정보 추출
+  const currentUserId = user?.id; // 👈 DB 유저 UUID 사용
+
+  // 1. 전달받은 래퍼 파라미터 수신
+  const rawParamsBook = route.params?.book || {};
+
+  // 2. 중첩 구조 탐색 (DB 아이템의 경우 item.book 또는 item.books 내부에 실제 데이터가 위치함)
+  const targetBook =
+    rawParamsBook.book ||
+    rawParamsBook.books ||
+    rawParamsBook.book_info ||
+    rawParamsBook.data ||
+    rawParamsBook;
+
+  // 3. 제목 정규화
+  const title =
+    targetBook?.title ||
+    rawParamsBook?.title ||
+    rawParamsBook?.book_title ||
+    '';
 
   const [loading, setLoading] = useState(false);
-  const [dbBookId, setDbBookId] = useState(book?.id || null); // 서재 DB 내의 실체 ID
-  const [currentStatus, setCurrentStatus] = useState(book?.status || null);
-  const [isSaved, setIsSaved] = useState(Boolean(book?.id || book?.status));
+  const [dbBookId, setDbBookId] = useState(rawParamsBook.id || targetBook?.id || null);
+  const [currentStatus, setCurrentStatus] = useState(rawParamsBook.status || targetBook?.status || null);
+  const [isSaved, setIsSaved] = useState(Boolean(rawParamsBook.id || targetBook?.id || rawParamsBook.status));
 
-  // 화면 진입 시 내 서재에 이미 있는 책인지 ISBN/제목 기반으로 검증
+  // 화면 진입 시 내 서재 중복/상태 확인
   useEffect(() => {
     const checkMyLibrary = async () => {
-      if (!book) return;
+      if (!title || !currentUserId) return;
+
       try {
-        const myBooks = await getUserBooks(TEST_USER_ID);
+        // 💡 기존 TEST_USER_ID 대신 실제 로그인된 유저 ID 전달
+        const myBooks = await getUserBooks(currentUserId);
         let bookList = [];
         if (Array.isArray(myBooks)) bookList = myBooks;
         else if (myBooks?.books) bookList = myBooks.books;
         else if (myBooks?.data) bookList = myBooks.data;
 
-        // ISBN 또는 제목으로 내 서재 도서 검색
-        const targetIsbn = book.isbn || book.isbn13;
+        const targetIsbn = targetBook?.isbn || targetBook?.isbn13 || rawParamsBook?.isbn;
         const matched = bookList.find((item) => {
-          if (targetIsbn && (item.isbn === targetIsbn || item.isbn13 === targetIsbn)) return true;
-          return item.title === book.title;
+          const itemBook = item.book || item.books || item;
+          if (targetIsbn && (itemBook.isbn === targetIsbn || itemBook.isbn13 === targetIsbn)) return true;
+          return (itemBook.title || item.title) === title;
         });
 
         if (matched) {
@@ -53,9 +72,9 @@ export default function BookDetailScreen({ route, navigation }) {
     };
 
     checkMyLibrary();
-  }, [book]);
+  }, [targetBook, rawParamsBook, title, currentUserId]);
 
-  if (!book) {
+  if (!title) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centerContainer}>
@@ -68,24 +87,54 @@ export default function BookDetailScreen({ route, navigation }) {
     );
   }
 
-  // 이미지 및 텍스트 데이터 파싱
-  const rawUrl = book.cover_url || book.thumbnail || book.coverImage;
+  // 4. 이미지 커버 URL 파싱 (DB 컬럼명: cover_url, cover_image / API 컬럼명: thumbnail, cover)
+  const rawUrl =
+    targetBook?.cover_url ||
+    targetBook?.thumbnail ||
+    targetBook?.cover_image ||
+    targetBook?.coverImage ||
+    targetBook?.cover ||
+    rawParamsBook?.cover_url ||
+    rawParamsBook?.thumbnail ||
+    rawParamsBook?.cover;
+
   const imageUrl = rawUrl ? rawUrl.replace('http://', 'https://') : null;
-  const authorText = Array.isArray(book.authors)
-    ? book.authors.join(', ')
-    : book.author || '저자 미상';
-  const descriptionText = book.contents || book.description || '상세 줄거리 정보가 제공되지 않는 도서입니다.';
+
+  // 5. 저자 정보 파싱 (DB: author 문자열 / API: authors 배열)
+  const authorText = Array.isArray(targetBook?.authors)
+    ? targetBook.authors.join(', ')
+    : targetBook?.author ||
+      targetBook?.authors ||
+      rawParamsBook?.author ||
+      (Array.isArray(rawParamsBook?.authors) ? rawParamsBook.authors.join(', ') : '저자 미상');
+
+  const publisherText = targetBook?.publisher || rawParamsBook?.publisher || '';
+
+  // 6. 줄거리/소개 파싱 (DB: description / API: contents)
+  const descriptionText =
+    targetBook?.description ||
+    targetBook?.contents ||
+    targetBook?.summary ||
+    targetBook?.book_description ||
+    rawParamsBook?.description ||
+    rawParamsBook?.contents ||
+    rawParamsBook?.summary ||
+    '상세 줄거리 정보가 제공되지 않는 도서입니다.';
 
   // 독서 상태 변경 및 서재 저장 처리
   const handleStatusChange = async (newStatus) => {
+    if (!currentUserId) {
+      Alert.alert('알림', '로그인이 필요한 기능입니다.');
+      return;
+    }
+
     try {
       setLoading(true);
       if (isSaved && dbBookId) {
-        // 내 서재 DB에 있는 경우 -> ID 기반 업데이트
         await updateUserBookStatus(dbBookId, newStatus);
       } else {
-        // 서재에 없는 새 책인 경우 -> 추가 후 생성된 ID 저장
-        const response = await addUserBook(TEST_USER_ID, book, newStatus);
+        // 💡 기존 TEST_USER_ID 대신 실제 로그인된 유저 ID 전달
+        const response = await addUserBook(currentUserId, targetBook, newStatus);
         const newId = response?.id || response?.data?.id;
         if (newId) setDbBookId(newId);
         setIsSaved(true);
@@ -104,7 +153,7 @@ export default function BookDetailScreen({ route, navigation }) {
   // 서재에서 삭제 처리
   const handleDelete = () => {
     if (!dbBookId) return;
-    Alert.alert('서재 삭제', `'${book.title}'을(를) 서재에서 삭제하시겠습니까?`, [
+    Alert.alert('서재 삭제', `'${title}'을(를) 서재에서 삭제하시겠습니까?`, [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제',
@@ -144,10 +193,10 @@ export default function BookDetailScreen({ route, navigation }) {
             </View>
           )}
 
-          <Text style={styles.title}>{book.title}</Text>
+          <Text style={styles.title}>{title}</Text>
           <Text style={styles.author}>{authorText}</Text>
           <Text style={styles.publisher}>
-            {book.publisher ? `${book.publisher} 출판` : ''}
+            {publisherText ? `${publisherText} 출판` : ''}
           </Text>
         </View>
 

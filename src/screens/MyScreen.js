@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,15 +7,19 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Alert, // 👈 [추가] 로그아웃 확인 팝업용 Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../constants/theme';
 import { getUserBooks } from '../api';
-
-const TEST_USER_ID = '00000000-0000-0000-0000-000000000000';
+import { AuthContext } from '../context/AuthContext'; // 👈 AuthContext 불러오기
 
 export default function MyScreen({ navigation }) {
+  // 💡 AuthContext에서 logout 함수 추가 추출
+  const { user, logout } = useContext(AuthContext); 
+  const currentUserId = user?.id; // DB 고유 유저 ID (UUID)
+
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     total: 0,
@@ -27,9 +31,14 @@ export default function MyScreen({ navigation }) {
 
   // 서재 데이터 기반 통계 계산 및 최신 도서 추출
   const fetchMyData = async () => {
+    if (!currentUserId) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await getUserBooks(TEST_USER_ID);
+      const data = await getUserBooks(currentUserId);
 
       let bookList = [];
       if (data && Array.isArray(data)) {
@@ -74,11 +83,23 @@ export default function MyScreen({ navigation }) {
     }
   };
 
+  // 💡 로그아웃 핸들러 함수
+  const handleLogout = () => {
+    Alert.alert('로그아웃', '정말 로그아웃하시겠습니까?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '로그아웃',
+        style: 'destructive',
+        onPress: () => logout(), // Context의 logout 실행 ➔ user가 null이 되며 로그인 화면으로 자동 전환
+      },
+    ]);
+  };
+
   // 화면 포커스 시 실시간 통계 최신화
   useFocusEffect(
     useCallback(() => {
       fetchMyData();
-    }, [])
+    }, [currentUserId])
   );
 
   return (
@@ -93,10 +114,17 @@ export default function MyScreen({ navigation }) {
         {/* 프로필 카드 */}
         <View style={styles.profileCard}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>책</Text>
+            <Text style={styles.avatarText}>
+              {user?.nickname ? user.nickname.substring(0, 1) : '책'}
+            </Text>
           </View>
-          <Text style={styles.profileName}>북향 수집가</Text>
+          <Text style={styles.profileName}>{user?.nickname || '북향 수집가'}</Text>
           <Text style={styles.profileSub}>민음사 서재를 차곡차곡 채우는 중입니다</Text>
+
+          {/* 💡 [추가] 로그아웃 버튼 */}
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutText}>로그아웃</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 독서 통계 요약 카드 */}
@@ -153,7 +181,10 @@ export default function MyScreen({ navigation }) {
                   key={item.id?.toString() || index.toString()}
                   style={styles.recentBookCard}
                   activeOpacity={0.8}
-                  onPress={() => navigation.navigate('BookDetail', { book: item })}
+                  onPress={() => {
+                    console.log('📌 마이페이지에서 넘겨주는 데이터:', JSON.stringify(item, null, 2));
+                    navigation.navigate('BookDetail', { book: item });
+                  }}
                 >
                   {cover ? (
                     <Image source={{ uri: cover }} style={styles.recentCover} resizeMode="cover" />
@@ -198,6 +229,21 @@ const styles = StyleSheet.create({
   avatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
   profileName: { fontSize: 18, fontWeight: 'bold', color: '#2B2118' },
   profileSub: { fontSize: 12, color: '#8C827A', marginTop: 4, textAlign: 'center' },
+  
+  // 💡 [추가] 로그아웃 버튼 스타일
+  logoutButton: {
+    marginTop: 14,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    backgroundColor: '#D9D0C1',
+    borderRadius: 20,
+  },
+  logoutText: {
+    fontSize: 12,
+    color: '#5C3D2E',
+    fontWeight: 'bold',
+  },
+
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#2B2118', marginBottom: 12 },
   loadingContainer: { paddingVertical: 20, alignItems: 'center' },
   statsCardContainer: {
