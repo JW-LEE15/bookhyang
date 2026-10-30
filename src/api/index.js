@@ -1,7 +1,11 @@
 import axios from 'axios';
 
-// 확인된 ngrok / 서버 주소 적용 (끝에 /api 추가)
-const BASE_URL = 'http://121.168.120.12:5000/api';
+// 서버 주소는 .env의 EXPO_PUBLIC_API_URL에서 읽는다 (끝에 /api 포함, .env.example 참고)
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
+if (!BASE_URL) {
+  console.error('EXPO_PUBLIC_API_URL이 설정되지 않았습니다. .env 파일을 확인하세요. (.env.example 참고)');
+}
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -10,6 +14,14 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': 'true', // ngrok 경고/안내 페이지 자동 패스
   },
+});
+
+// 서버 주소가 없으면 잘못된 곳으로 요청하지 않고 바로 실패시킨다
+api.interceptors.request.use((config) => {
+  if (!BASE_URL) {
+    return Promise.reject(new Error('EXPO_PUBLIC_API_URL이 설정되지 않아 요청할 수 없습니다.'));
+  }
+  return config;
 });
 
 // 1. 카카오 도서 검색 API (백엔드 응답 포맷 유연 처리 보완)

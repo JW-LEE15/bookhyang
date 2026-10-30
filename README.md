@@ -57,5 +57,9 @@
 # 1. 의존성 패키지 설치
 npm install
 
-# 2. Expo 개발 서버 실행
+# 2. 서버 주소 설정: .env.example을 복사해 .env를 만들고 EXPO_PUBLIC_API_URL 값을 입력
+#    (.env는 git에 올라가지 않으며, 값을 바꾼 뒤에는 앱을 전체 리로드)
+cp .env.example .env
+
+# 3. Expo 개발 서버 실행
 npx expo start
