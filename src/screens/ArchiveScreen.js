@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useContext } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,10 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../constants/theme';
 import { getUserBooks } from '../api';
-
-const TEST_USER_ID = '00000000-0000-0000-0000-000000000000';
+import { AuthContext } from '../context/AuthContext';
 
 export default function ArchiveScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
+  const currentUserId = user?.id; // 로그인한 사용자의 DB ID
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -23,9 +24,15 @@ export default function ArchiveScreen({ navigation }) {
 
   // 서재 도서 목록 조회
   const fetchMyBooks = async () => {
+    if (!currentUserId) {
+      setBooks([]);
+      setFilteredBooks([]);
+      return;
+    }
+
     try {
       setLoading(true);
-      const data = await getUserBooks(TEST_USER_ID);
+      const data = await getUserBooks(currentUserId);
 
       let bookList = [];
       if (data && Array.isArray(data)) {
@@ -69,7 +76,7 @@ export default function ArchiveScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchMyBooks();
-    }, [])
+    }, [currentUserId])
   );
 
   // 도서 카드 아이템 렌더링

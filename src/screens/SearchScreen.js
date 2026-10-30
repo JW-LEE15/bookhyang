@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,10 +15,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { searchBooks, addUserBook, getUserBooks, updateUserBookStatus } from '../api';
-
-const TEST_USER_ID = '00000000-0000-0000-0000-000000000000';
+import { AuthContext } from '../context/AuthContext';
 
 export default function SearchScreen({ navigation }) {
+  const { user } = useContext(AuthContext);
+  const currentUserId = user?.id; // 로그인한 사용자의 DB ID
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,11 +63,15 @@ export default function SearchScreen({ navigation }) {
   // 선택한 상태로 서재 추가 또는 업데이트
   const handleAddBookWithStatus = async (status) => {
     if (!selectedBook) return;
+    if (!currentUserId) {
+      Alert.alert('알림', '로그인이 필요한 기능입니다.');
+      return;
+    }
     try {
       setAdding(true);
 
       // 1. 내 서재에 이미 등록되어 있는지 확인
-      const myBooks = await getUserBooks(TEST_USER_ID);
+      const myBooks = await getUserBooks(currentUserId);
       let bookList = [];
       if (Array.isArray(myBooks)) bookList = myBooks;
       else if (myBooks?.books) bookList = myBooks.books;
@@ -86,7 +91,7 @@ export default function SearchScreen({ navigation }) {
         Alert.alert('서재 상태 변경', `이미 서재에 있는 책입니다. [${statusKor}] 상태로 변경되었습니다.`);
       } else {
         // 2-B. 신규 도서인 경우 새로 추가
-        await addUserBook(TEST_USER_ID, selectedBook, status);
+        await addUserBook(currentUserId, selectedBook, status);
         Alert.alert('서재 추가 완료', `[${statusKor}] 상태로 서재에 담겼습니다.`);
       }
 
