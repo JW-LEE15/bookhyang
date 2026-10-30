@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
+import KeyboardAwareContainer from '../components/KeyboardAwareContainer';
 
 export default function SignupScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -29,7 +30,7 @@ export default function SignupScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareContainer>
       <Text style={styles.title}>회원가입</Text>
 
       <TextInput
@@ -64,12 +65,11 @@ export default function SignupScreen({ navigation }) {
       <TouchableOpacity style={styles.button} onPress={handleSignup}>
         <Text style={styles.buttonText}>가입하기</Text>
       </TouchableOpacity>
-    </View>
+    </KeyboardAwareContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#fff' },
   title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 30, color: '#333' },
   input: { borderBottomWidth: 1, borderBottomColor: '#ccc', paddingVertical: 10, marginBottom: 15, fontSize: 16 },
   button: { backgroundColor: '#4A90E2', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },

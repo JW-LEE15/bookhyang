@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { AuthContext } from '../context/AuthContext';
+import KeyboardAwareContainer from '../components/KeyboardAwareContainer';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -30,7 +31,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareContainer>
       <Text style={styles.title}>북향 (BookHyang)</Text>
 
       <TextInput
@@ -64,12 +65,11 @@ export default function LoginScreen({ navigation }) {
       <TouchableOpacity onPress={() => navigation.navigate('Signup')} disabled={loading}>
         <Text style={styles.linkText}>계정이 없으신가요? 회원가입</Text>
       </TouchableOpacity>
-    </View>
+    </KeyboardAwareContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#fff' },
   title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 30, color: '#333' },
   input: { borderBottomWidth: 1, borderBottomColor: '#ccc', paddingVertical: 10, marginBottom: 15, fontSize: 16 },
   button: { backgroundColor: '#4A90E2', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
