@@ -6,11 +6,16 @@ export default function SignupScreen({ navigation }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const { signup } = useContext(AuthContext);
 
   const handleSignup = async () => {
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !passwordConfirm) {
       Alert.alert('알림', '모든 항목을 입력해 주세요.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      Alert.alert('알림', '비밀번호가 일치하지 않아요.');
       return;
     }
     const result = await signup(email, password, name);
@@ -46,6 +51,13 @@ export default function SignupScreen({ navigation }) {
         placeholder="비밀번호"
         value={password}
         onChangeText={setPassword}
+        secureTextEntry
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="비밀번호 확인"
+        value={passwordConfirm}
+        onChangeText={setPasswordConfirm}
         secureTextEntry
       />
 
