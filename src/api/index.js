@@ -16,13 +16,75 @@ const api = axios.create({
   },
 });
 
-// 서버 주소가 없으면 잘못된 곳으로 요청하지 않고 바로 실패시킨다
+// ---- 로그인 토큰 ----
+// 토큰 원본은 SecureStore에 있고(tokenStorage.js), 요청에 붙일 값만 메모리에 둔다. AuthContext가 설정한다.
+// 토큰 값과 Authorization 헤더는 로그나 화면에 출력하지 않는다.
+let authToken = null;
+// 토큰이 바뀔 때마다 1씩 늘린다. 예전 토큰으로 보낸 요청의 401이 새 로그인을 로그아웃시키지 않게 한다.
+let authGeneration = 0;
+// 토큰이 만료되거나 거부됐을 때 호출할 함수 (AuthContext가 등록)
+let unauthorizedHandler = null;
+
+// 로그인/회원가입 요청의 401은 "비밀번호 틀림" 등이므로 자동 로그아웃하지 않는다
+const AUTH_PATHS = ['/auth/login', '/auth/signup'];
+
+export const setAuthToken = (token) => {
+  authToken = token || null;
+  authGeneration += 1;
+};
+
+export const setUnauthorizedHandler = (handler) => {
+  unauthorizedHandler = handler;
+};
+
+// config의 요청 헤더에서 Authorization을 지운다
+const removeAuthHeader = (config) => {
+  const headers = config?.headers;
+  if (!headers) return;
+  if (typeof headers.delete === 'function') headers.delete('Authorization');
+  else delete headers.Authorization;
+};
+
+// 에러 객체에서 토큰이 닿을 수 있는 곳을 지운다 (화면에서 console.error(error)로 찍어도 토큰이 안 나오게)
+// - error.config / error.response.config: 요청 헤더 (axios에서는 보통 같은 객체지만 달라도 둘 다 지운다)
+// - error.request / error.response.request: XHR 객체 (React Native는 요청 헤더를 _headers에 보관한다)
+const removeAuthFromError = (error) => {
+  if (!error) return error;
+  removeAuthHeader(error.config);
+  if (error.response) {
+    if (error.response.config !== error.config) removeAuthHeader(error.response.config);
+    if (error.response.request) error.response.request = undefined;
+  }
+  if (error.request) error.request = undefined;
+  return error;
+};
+
+// 서버 주소가 없으면 잘못된 곳으로 요청하지 않고 바로 실패시킨다. 토큰이 있으면 헤더에 붙인다.
 api.interceptors.request.use((config) => {
   if (!BASE_URL) {
     return Promise.reject(new Error('EXPO_PUBLIC_API_URL이 설정되지 않아 요청할 수 없습니다.'));
   }
+  config.authGeneration = authGeneration;
+  if (authToken) {
+    config.headers.Authorization = `Bearer ${authToken}`;
+  }
   return config;
 });
+
+// 401이면 (로그인/회원가입 요청 제외) 로그아웃 처리를 부른다
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const config = error?.config;
+    const isAuthRequest = AUTH_PATHS.some((path) => config?.url?.startsWith(path));
+    const sentWithCurrentToken = config?.authGeneration === authGeneration && authToken !== null;
+
+    if (error?.response?.status === 401 && !isAuthRequest && sentWithCurrentToken && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
+    return Promise.reject(removeAuthFromError(error));
+  }
+);
 
 // 1. 카카오 도서 검색 API (백엔드 응답 포맷 유연 처리 보완)
 export const searchBooks = async (query) => {
@@ -44,10 +106,10 @@ export const searchBooks = async (query) => {
   }
 };
 
-// 2. 내 서재 도서 목록 조회 API
-export const getUserBooks = async (userId) => {
+// 2. 내 서재 도서 목록 조회 API (요청자는 서버가 토큰으로 확인)
+export const getUserBooks = async () => {
   try {
-    const response = await api.get(`/user-books/${userId}`);
+    const response = await api.get('/user-books');
     return response.data;
   } catch (error) {
     console.error('서재 조회 API 에러:', error.message);
@@ -55,8 +117,8 @@ export const getUserBooks = async (userId) => {
   }
 };
 
-// 3. 내 서재에 도서 추가 API (줄거리 및 도서 정보 필드 호환 정규화 보완)
-export const addUserBook = async (userId, bookInfo, status = 'READING') => {
+// 3. 내 서재에 도서 추가 API (줄거리 및 도서 정보 필드 호환 정규화 보완, 요청자는 서버가 토큰으로 확인)
+export const addUserBook = async (bookInfo, status = 'READING') => {
   try {
     // 백엔드/DB 테이블 구조에 맞게 도서 정보 정규화 (contents -> description 포함)
     const normalizedBook = {
@@ -76,7 +138,6 @@ export const addUserBook = async (userId, bookInfo, status = 'READING') => {
     };
 
     const response = await api.post('/user-books', {
-      userId,
       bookInfo: normalizedBook,
       status,
     });
@@ -104,7 +165,7 @@ export const updateUserBookStatus = async (bookId, status) => {
     const response = await api.patch(`/user-books/${bookId}/status`, { status });
     return response.data;
   } catch (error) {
-    console.error('도서 상태 변경 실패:', error);
+    console.error('도서 상태 변경 실패:', error.message);
     throw error;
   }
 };

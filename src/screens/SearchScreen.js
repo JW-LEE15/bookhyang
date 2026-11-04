@@ -71,7 +71,7 @@ export default function SearchScreen({ navigation }) {
       setAdding(true);
 
       // 1. 내 서재에 이미 등록되어 있는지 확인
-      const myBooks = await getUserBooks(currentUserId);
+      const myBooks = await getUserBooks();
       let bookList = [];
       if (Array.isArray(myBooks)) bookList = myBooks;
       else if (myBooks?.books) bookList = myBooks.books;
@@ -91,7 +91,7 @@ export default function SearchScreen({ navigation }) {
         Alert.alert('서재 상태 변경', `이미 서재에 있는 책입니다. [${statusKor}] 상태로 변경되었습니다.`);
       } else {
         // 2-B. 신규 도서인 경우 새로 추가
-        await addUserBook(currentUserId, selectedBook, status);
+        await addUserBook(selectedBook, status);
         Alert.alert('서재 추가 완료', `[${statusKor}] 상태로 서재에 담겼습니다.`);
       }
 

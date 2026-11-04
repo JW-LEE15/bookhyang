@@ -32,7 +32,7 @@ export default function ArchiveScreen({ navigation }) {
 
     try {
       setLoading(true);
-      const data = await getUserBooks(currentUserId);
+      const data = await getUserBooks();
 
       let bookList = [];
       if (data && Array.isArray(data)) {
