@@ -47,8 +47,8 @@ export default function BookDetailScreen({ route, navigation }) {
       if (!title || !currentUserId) return;
 
       try {
-        // 💡 기존 TEST_USER_ID 대신 실제 로그인된 유저 ID 전달
-        const myBooks = await getUserBooks(currentUserId);
+        // 💡 내 서재 조회 (요청자는 서버가 토큰으로 확인)
+        const myBooks = await getUserBooks();
         let bookList = [];
         if (Array.isArray(myBooks)) bookList = myBooks;
         else if (myBooks?.books) bookList = myBooks.books;
@@ -133,8 +133,8 @@ export default function BookDetailScreen({ route, navigation }) {
       if (isSaved && dbBookId) {
         await updateUserBookStatus(dbBookId, newStatus);
       } else {
-        // 💡 기존 TEST_USER_ID 대신 실제 로그인된 유저 ID 전달
-        const response = await addUserBook(currentUserId, targetBook, newStatus);
+        // 💡 내 서재에 추가 (요청자는 서버가 토큰으로 확인)
+        const response = await addUserBook(targetBook, newStatus);
         const newId = response?.id || response?.data?.id;
         if (newId) setDbBookId(newId);
         setIsSaved(true);
