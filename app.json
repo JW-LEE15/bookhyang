@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "bookhyang",
+    "name": "북향",
     "slug": "bookhyang",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -18,11 +18,11 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.bookhyang.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "usesCleartextTraffic": true
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +30,11 @@
     "plugins": [
       "expo-status-bar",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8f45aa34-8396-4776-a59d-14324207a04f"
+      }
+    }
   }
 }
