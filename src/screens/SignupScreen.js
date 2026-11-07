@@ -36,12 +36,14 @@ export default function SignupScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="이름"
+        placeholderTextColor="#999"
         value={name}
         onChangeText={setName}
       />
       <TextInput
         style={styles.input}
         placeholder="이메일"
+        placeholderTextColor="#999"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -50,6 +52,7 @@ export default function SignupScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="비밀번호"
+        placeholderTextColor="#999"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -57,6 +60,7 @@ export default function SignupScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="비밀번호 확인"
+        placeholderTextColor="#999"
         value={passwordConfirm}
         onChangeText={setPasswordConfirm}
         secureTextEntry
@@ -71,7 +75,7 @@ export default function SignupScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 30, color: '#333' },
-  input: { borderBottomWidth: 1, borderBottomColor: '#ccc', paddingVertical: 10, marginBottom: 15, fontSize: 16 },
+  input: { borderBottomWidth: 1, borderBottomColor: '#ccc', paddingVertical: 10, marginBottom: 15, fontSize: 16, color: '#333' },
   button: { backgroundColor: '#4A90E2', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
