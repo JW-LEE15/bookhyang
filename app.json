@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.bookhyang.app",
+      "userInterfaceStyle": "light",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -30,7 +31,8 @@
     "plugins": [
       "expo-status-bar",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "expo-system-ui"
     ],
     "extra": {
       "eas": {
