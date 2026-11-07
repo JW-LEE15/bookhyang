@@ -37,6 +37,7 @@ export default function LoginScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="이메일"
+        placeholderTextColor="#999"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -45,6 +46,7 @@ export default function LoginScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="비밀번호"
+        placeholderTextColor="#999"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
@@ -71,7 +73,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 30, color: '#333' },
-  input: { borderBottomWidth: 1, borderBottomColor: '#ccc', paddingVertical: 10, marginBottom: 15, fontSize: 16 },
+  input: { borderBottomWidth: 1, borderBottomColor: '#ccc', paddingVertical: 10, marginBottom: 15, fontSize: 16, color: '#333' },
   button: { backgroundColor: '#4A90E2', padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   buttonDisabled: { backgroundColor: '#A0C4E8' },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },

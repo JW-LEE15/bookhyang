@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -19,6 +14,7 @@
     },
     "android": {
       "package": "com.bookhyang.app",
+      "userInterfaceStyle": "light",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -29,7 +25,18 @@
     },
     "plugins": [
       "expo-status-bar",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font",
+      "expo-system-ui",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#ffffff",
+          "resizeMode": "contain",
+          "imageWidth": 200
+        }
+      ]
     ],
     "extra": {
       "eas": {
