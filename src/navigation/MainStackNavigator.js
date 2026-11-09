@@ -6,6 +6,7 @@ import { AuthContext } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import BookDetailScreen from '../screens/BookDetailScreen';
+import LegalDocumentScreen from '../screens/LegalDocumentScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 
 const Stack = createStackNavigator();
@@ -31,7 +32,19 @@ export default function MainStackNavigator() {
           <Stack.Screen 
             name="BookDetail" 
             component={BookDetailScreen} 
-            options={{ headerShown: true, title: '도서 상세 정보' }} 
+            options={{ headerShown: true, title: '도서 상세 정보' }}
+          />
+          <Stack.Screen
+            name="Terms"
+            component={LegalDocumentScreen}
+            initialParams={{ type: 'terms' }}
+            options={{ headerShown: true, title: '이용약관' }}
+          />
+          <Stack.Screen
+            name="Privacy"
+            component={LegalDocumentScreen}
+            initialParams={{ type: 'privacy' }}
+            options={{ headerShown: true, title: '개인정보 처리방침' }}
           />
         </>
       ) : (

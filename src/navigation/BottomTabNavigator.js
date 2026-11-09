@@ -8,17 +8,12 @@ import HomeScreen from '../screens/HomeScreen';
 import ArchiveScreen from '../screens/ArchiveScreen';
 import SearchScreen from '../screens/SearchScreen';
 import MyScreen from '../screens/MyScreen';
+import SettingsScreen from '../screens/SettingsScreens';
 
 // 임시 대체 컴포넌트
 const TempCommunity = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
     <Text>동네 독서 모임 커뮤니티 준비 중</Text>
-  </View>
-);
-
-const TempSettings = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-    <Text>설정 화면 준비 중</Text>
   </View>
 );
 
@@ -60,7 +55,7 @@ export default function BottomTabNavigator() {
       <Tab.Screen name="검색" component={SearchScreen} />
       <Tab.Screen name="커뮤니티" component={TempCommunity} />
       <Tab.Screen name="MY" component={MyScreen} />
-      <Tab.Screen name="설정" component={TempSettings} />
+      <Tab.Screen name="설정" component={SettingsScreen} />
     </Tab.Navigator>
   );
 }
