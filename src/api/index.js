@@ -170,6 +170,42 @@ export const updateUserBookStatus = async (bookId, status) => {
   }
 };
 
+// 책별 댓글 목록 조회 API (공개, 최신순). isbn은 ISBN13. before는 이 댓글 id보다 오래된 댓글만 (문자열)
+export const getComments = async (isbn, { limit, before } = {}) => {
+  try {
+    const params = { isbn };
+    if (limit) params.limit = limit;
+    if (before) params.before = before;
+    const response = await api.get('/comments', { params });
+    return response.data;
+  } catch (error) {
+    console.error('댓글 조회 API 에러:', error.message);
+    throw error;
+  }
+};
+
+// 댓글 작성 API (로그인 필요, 작성자는 서버가 토큰으로 확인)
+export const createComment = async (isbn, content) => {
+  try {
+    const response = await api.post('/comments', { isbn, content });
+    return response.data;
+  } catch (error) {
+    console.error('댓글 작성 API 에러:', error.message);
+    throw error;
+  }
+};
+
+// 댓글 삭제 API (본인 댓글만. 남의 댓글, 없는 댓글은 서버가 같은 404로 응답)
+export const deleteComment = async (commentId) => {
+  try {
+    const response = await api.delete(`/comments/${encodeURIComponent(commentId)}`);
+    return response.data;
+  } catch (error) {
+    console.error('댓글 삭제 API 에러:', error.message);
+    throw error;
+  }
+};
+
 // 💡 [신규 추가] 6. 회원가입 API (POST /api/auth/signup)
 export const signupUser = async (email, password, nickname) => {
   try {
