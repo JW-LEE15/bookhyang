@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { addUserBook, updateUserBookStatus, deleteUserBook, getUserBooks } from '../api';
 import { AuthContext } from '../context/AuthContext'; // 👈 AuthContext 불러오기
+import BookCommentPreview from '../components/BookCommentPreview';
+import { getIsbn13 } from '../utils/isbn';
 
 export default function BookDetailScreen({ route, navigation }) {
   const { user } = useContext(AuthContext); // 👈 로그인 유저 정보 추출
@@ -109,6 +111,14 @@ export default function BookDetailScreen({ route, navigation }) {
       (Array.isArray(rawParamsBook?.authors) ? rawParamsBook.authors.join(', ') : '저자 미상');
 
   const publisherText = targetBook?.publisher || rawParamsBook?.publisher || '';
+
+  // 댓글은 ISBN13으로만 책을 구분한다 (10자리는 체크섬이 맞을 때만 변환, 못 얻으면 null → 댓글 사용 불가)
+  const isbn13 = getIsbn13(
+    targetBook?.isbn,
+    targetBook?.isbn13,
+    rawParamsBook?.isbn,
+    rawParamsBook?.isbn13
+  );
 
   // 6. 줄거리/소개 파싱 (DB: description / API: contents)
   const descriptionText =
@@ -272,6 +282,12 @@ export default function BookDetailScreen({ route, navigation }) {
           <Text style={styles.sectionTitle}>도서 소개</Text>
           <Text style={styles.descriptionText}>{descriptionText}</Text>
         </View>
+
+        {/* 독자 댓글 미리보기 */}
+        <BookCommentPreview
+          isbn13={isbn13}
+          onPressViewAll={() => navigation.navigate('BookComments', { isbn13, title })}
+        />
       </ScrollView>
     </SafeAreaView>
   );
