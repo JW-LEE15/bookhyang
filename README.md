@@ -53,7 +53,7 @@
 
 ## ⚙️ 실행 방법 (Getting Started)
 
-```bash
+
 # 1. 의존성 패키지 설치
 npm install
 
