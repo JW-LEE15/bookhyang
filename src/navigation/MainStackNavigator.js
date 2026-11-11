@@ -6,6 +6,7 @@ import { AuthContext } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import BookDetailScreen from '../screens/BookDetailScreen';
+import MyLibraryScreen from '../screens/MyLibraryScreen';
 import BookCommentsScreen from '../screens/BookCommentsScreen';
 import LegalDocumentScreen from '../screens/LegalDocumentScreen';
 import BottomTabNavigator from './BottomTabNavigator';
@@ -34,6 +35,11 @@ export default function MainStackNavigator() {
             name="BookDetail" 
             component={BookDetailScreen} 
             options={{ headerShown: true, title: '도서 상세 정보' }}
+          />
+          <Stack.Screen
+            name="MyLibrary"
+            component={MyLibraryScreen}
+            options={{ headerShown: true, title: '내 서재' }}
           />
           <Stack.Screen
             name="BookComments"
