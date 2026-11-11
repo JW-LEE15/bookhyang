@@ -220,6 +220,29 @@ export const getBooks = async ({ category, sort = 'title', page = 1, limit = 30 
   }
 };
 
+// 책 소개글 API (공개). id는 books 테이블 id(catalogId). 응답: { success, data: { description: string | null } }
+// 소개글은 서버가 카카오에서 실시간으로 가져오고(약 250자), 실패하면 null. IP 제한으로 429(RATE_LIMITED)가 올 수 있다.
+export const getBookDescription = async (id) => {
+  try {
+    const response = await api.get(`/books/${encodeURIComponent(id)}/description`);
+    return response.data;
+  } catch (error) {
+    console.error('책 소개글 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 관련 책 API (공개). 같은 분야 또는 같은 작가의 책 최대 10권. 응답: { success, data: [books 행] }
+export const getRelatedBooks = async (id) => {
+  try {
+    const response = await api.get(`/books/${encodeURIComponent(id)}/related`);
+    return response.data;
+  } catch (error) {
+    console.error('관련 책 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
 // AI 독서 추천 API (로그인 필요). AI 응답이 느려서 이 요청만 timeout을 30초로 덮어쓴다.
 // taste: { genres, topics, moods, useHistory }
 // refresh: 「다시 추천」일 때만 true (처음 요청은 false)

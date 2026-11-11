@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -14,7 +14,14 @@ import { COLORS } from '../constants/theme';
 import { addUserBook, updateUserBookStatus, deleteUserBook, getUserBooks } from '../api';
 import { AuthContext } from '../context/AuthContext'; // 👈 AuthContext 불러오기
 import BookCommentPreview from '../components/BookCommentPreview';
+import BookDescriptionSection from '../components/BookDescriptionSection';
+import RelatedBooksSection from '../components/RelatedBooksSection';
 import { getIsbn13 } from '../utils/isbn';
+import { toDetailBook } from '../utils/bookShape';
+import { recordRecentBook } from '../storage/recentBooksStorage';
+
+// TODO: 「민음사에서 보기」 링크 주소가 정해지면 여기에 넣고 Linking.openURL로 연결한다.
+const MINUMSA_URL = null;
 
 export default function BookDetailScreen({ route, navigation }) {
   const { user } = useContext(AuthContext); // 👈 로그인 유저 정보 추출
@@ -76,6 +83,33 @@ export default function BookDetailScreen({ route, navigation }) {
     checkMyLibrary();
   }, [targetBook, rawParamsBook, title, currentUserId]);
 
+  // 최근 열어본 책 기록 (기기에 계정별로 저장. 서버로 보내지 않는다)
+  useEffect(() => {
+    if (!title || !currentUserId) return;
+    const rawThumb =
+      targetBook?.thumbnail || targetBook?.cover_url || targetBook?.cover_image || rawParamsBook?.thumbnail;
+    recordRecentBook(currentUserId, {
+      isbn: targetBook?.isbn || targetBook?.isbn13 || rawParamsBook?.isbn || '',
+      title,
+      author: Array.isArray(targetBook?.authors) ? targetBook.authors.join(', ') : targetBook?.author || '',
+      thumbnail: rawThumb ? String(rawThumb).replace('http://', 'https://') : '',
+    });
+    // 책을 연 순간에만 기록한다 (같은 화면에서 다시 그려질 때마다 기록하지 않는다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, currentUserId]);
+
+  // 섹션 이동 버튼: 각 섹션의 위치를 기억해 두었다가 scrollTo로 이동한다
+  const scrollRef = useRef(null);
+  const sectionY = useRef({});
+  const [relatedCount, setRelatedCount] = useState(0);
+  const scrollToSection = (name) => {
+    const y = sectionY.current[name];
+    if (typeof y === 'number') scrollRef.current?.scrollTo({ y: Math.max(0, y - 8), animated: true });
+  };
+  const trackSection = (name) => (e) => {
+    sectionY.current[name] = e.nativeEvent.layout.y;
+  };
+
   if (!title) {
     return (
       <SafeAreaView style={styles.container}>
@@ -121,7 +155,7 @@ export default function BookDetailScreen({ route, navigation }) {
   );
 
   // 6. 줄거리/소개 파싱 (DB: description / API: contents)
-  const descriptionText =
+  const ownDescription =
     targetBook?.description ||
     targetBook?.contents ||
     targetBook?.summary ||
@@ -129,7 +163,17 @@ export default function BookDetailScreen({ route, navigation }) {
     rawParamsBook?.description ||
     rawParamsBook?.contents ||
     rawParamsBook?.summary ||
-    '상세 줄거리 정보가 제공되지 않는 도서입니다.';
+    '';
+  const fallbackDescription = '상세 줄거리 정보가 제공되지 않는 도서입니다.';
+
+  // 모음집에서 온 책이면 catalogId가 있다 (toDetailBook이 books 행의 id를 이 이름으로 넘긴다)
+  const catalogId = rawParamsBook?.catalogId ?? targetBook?.catalogId ?? null;
+  const categoryText = catalogId != null && targetBook?.category ? targetBook.category : '정보 없음';
+  const yearMatch =
+    catalogId != null && typeof targetBook?.publishedDate === 'string'
+      ? targetBook.publishedDate.match(/^(\d{4})/)
+      : null;
+  const yearText = yearMatch ? `${yearMatch[1]}년` : '정보 없음';
 
   // 독서 상태 변경 및 서재 저장 처리
   const handleStatusChange = async (newStatus) => {
@@ -187,7 +231,7 @@ export default function BookDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent}>
         {/* 상단 뒤로가기 헤더 */}
         <TouchableOpacity style={styles.headerBack} onPress={() => navigation.goBack()}>
           <Text style={styles.headerBackText}>&lt; 뒤로</Text>
@@ -208,6 +252,35 @@ export default function BookDetailScreen({ route, navigation }) {
           <Text style={styles.publisher}>
             {publisherText ? `${publisherText} 출판` : ''}
           </Text>
+          <Text style={styles.metaText}>
+            분야 {categoryText} · 출간 {yearText}
+          </Text>
+
+          {/* TODO: 주소가 정해지면 MINUMSA_URL을 채우고 Linking.openURL로 연결 */}
+          <TouchableOpacity
+            style={styles.externalButton}
+            activeOpacity={0.8}
+            onPress={() => {
+              if (!MINUMSA_URL) Alert.alert('알림', '민음사 링크는 준비 중입니다.');
+            }}
+          >
+            <Text style={styles.externalButtonText}>민음사에서 보기</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 섹션 이동 버튼 */}
+        <View style={styles.sectionNav}>
+          <TouchableOpacity style={styles.sectionNavButton} onPress={() => scrollToSection('description')}>
+            <Text style={styles.sectionNavText}>소개</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.sectionNavButton} onPress={() => scrollToSection('comments')}>
+            <Text style={styles.sectionNavText}>댓글</Text>
+          </TouchableOpacity>
+          {relatedCount > 0 ? (
+            <TouchableOpacity style={styles.sectionNavButton} onPress={() => scrollToSection('related')}>
+              <Text style={styles.sectionNavText}>관련 책</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* 독서 상태 선택 바 */}
@@ -278,16 +351,30 @@ export default function BookDetailScreen({ route, navigation }) {
         </View>
 
         {/* 줄거리 / 상세 소개 */}
-        <View style={styles.descriptionSection}>
-          <Text style={styles.sectionTitle}>도서 소개</Text>
-          <Text style={styles.descriptionText}>{descriptionText}</Text>
+        <View onLayout={trackSection('description')}>
+          <BookDescriptionSection
+            ownDescription={ownDescription}
+            catalogId={catalogId}
+            fallbackText={fallbackDescription}
+          />
         </View>
 
         {/* 독자 댓글 미리보기 */}
-        <BookCommentPreview
-          isbn13={isbn13}
-          onPressViewAll={() => navigation.navigate('BookComments', { isbn13, title })}
-        />
+        <View onLayout={trackSection('comments')}>
+          <BookCommentPreview
+            isbn13={isbn13}
+            onPressViewAll={() => navigation.navigate('BookComments', { isbn13, title })}
+          />
+        </View>
+
+        {/* 관련 책 (모음집에서 온 책만, 없으면 숨김). push로 새 상세 화면을 쌓는다 */}
+        <View onLayout={trackSection('related')}>
+          <RelatedBooksSection
+            catalogId={catalogId}
+            onCountChange={setRelatedCount}
+            onPressBook={(row) => navigation.push('BookDetail', { book: toDetailBook(row) })}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -332,6 +419,25 @@ const styles = StyleSheet.create({
   statusButtonTextActive: { color: '#FFFFFF' },
   deleteButton: { marginTop: 14, alignItems: 'center', paddingVertical: 8 },
   deleteButtonText: { fontSize: 13, color: '#FF3B30', fontWeight: '600' },
-  descriptionSection: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16, elevation: 2 },
-  descriptionText: { fontSize: 14, color: '#4A4A4A', lineHeight: 22 },
+  metaText: { fontSize: 12, color: COLORS.textSecondary, textAlign: 'center', marginTop: 6 },
+  externalButton: {
+    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  externalButtonText: { fontSize: 13, fontWeight: 'bold', color: COLORS.primary },
+  sectionNav: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  sectionNavButton: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  sectionNavText: { fontSize: 13, fontWeight: 'bold', color: COLORS.primary },
 });
