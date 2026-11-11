@@ -206,6 +206,20 @@ export const deleteComment = async (commentId) => {
   }
 };
 
+// 모음집 도서 목록 API (공개). category 생략이면 전체(소설/시/에세이), sort는 'title'(기본) | 'latest'
+// 응답: { success, data: [books 행], pagination: { page, limit, total, hasNext } }
+export const getBooks = async ({ category, sort = 'title', page = 1, limit = 30 } = {}) => {
+  try {
+    const params = { sort, page, limit };
+    if (category) params.category = category;
+    const response = await api.get('/books', { params });
+    return response.data;
+  } catch (error) {
+    console.error('모음집 조회 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
 // AI 독서 추천 API (로그인 필요). AI 응답이 느려서 이 요청만 timeout을 30초로 덮어쓴다.
 // taste: { genres, topics, moods, useHistory }
 // refresh: 「다시 추천」일 때만 true (처음 요청은 false)
