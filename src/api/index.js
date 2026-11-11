@@ -243,6 +243,66 @@ export const getRelatedBooks = async (id) => {
   }
 };
 
+// ---- 독서 기록 API (모두 로그인 필요, id는 user_books.id) ----
+
+// MY 화면용 요약. 응답 data: { month, counts: { total, completed, reading, wish, completed_this_month, notes }, recent_completed: [...] }
+export const getUserBooksSummary = async (recent = 5) => {
+  try {
+    const response = await api.get('/user-books/summary', { params: { recent } });
+    return response.data;
+  } catch (error) {
+    console.error('독서 기록 요약 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 완독일 수정 (완독 상태인 내 도서만). readEndDate: 'YYYY-MM-DD'. 응답 data: { id, status, read_end_date }
+// 실패하면 예외를 던진다. 400 VALIDATION_ERROR, 404, 409 NOT_COMPLETED는 error.response.status로 구분한다.
+export const updateReadEndDate = async (id, readEndDate) => {
+  try {
+    const response = await api.patch(`/user-books/${encodeURIComponent(id)}/read-end-date`, {
+      read_end_date: readEndDate,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('완독일 수정 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 메모 조회. 응답 data: { id, user_book_id, content, created_at, updated_at } 또는 null(메모 없음)
+export const getUserBookNote = async (id) => {
+  try {
+    const response = await api.get(`/user-books/${encodeURIComponent(id)}/note`);
+    return response.data;
+  } catch (error) {
+    console.error('메모 조회 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 메모 작성/수정 (둘 다 PUT). content는 공백을 뺀 1~2000자. 메모 내용은 로그에 남기지 않는다.
+export const saveUserBookNote = async (id, content) => {
+  try {
+    const response = await api.put(`/user-books/${encodeURIComponent(id)}/note`, { content });
+    return response.data;
+  } catch (error) {
+    console.error('메모 저장 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 메모 삭제. 메모가 없으면 404 code:'NOTE_NOT_FOUND'
+export const deleteUserBookNote = async (id) => {
+  try {
+    const response = await api.delete(`/user-books/${encodeURIComponent(id)}/note`);
+    return response.data;
+  } catch (error) {
+    console.error('메모 삭제 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
 // AI 독서 추천 API (로그인 필요). AI 응답이 느려서 이 요청만 timeout을 30초로 덮어쓴다.
 // taste: { genres, topics, moods, useHistory }
 // refresh: 「다시 추천」일 때만 true (처음 요청은 false)

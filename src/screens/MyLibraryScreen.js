@@ -7,12 +7,20 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../constants/theme';
-import { getUserBooks } from '../api';
+import { getUserBooks, updateReadEndDate } from '../api';
 import { AuthContext } from '../context/AuthContext';
+import ReadEndDateEditor from '../components/ReadEndDateEditor';
+import { normalizeReadEndDate } from '../utils/readEndDate';
+
+const isCompleted = (item) => {
+  const status = (item.status || '').toUpperCase();
+  return status === 'COMPLETED' || status === '완독' || status === 'FINISHED';
+};
 
 export default function MyLibraryScreen({ navigation }) {
   const { user } = useContext(AuthContext);
@@ -21,6 +29,7 @@ export default function MyLibraryScreen({ navigation }) {
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('ALL'); // ALL, READING, COMPLETED, WISH
+  const [dateTarget, setDateTarget] = useState(null); // 완독일을 입력 중인 서재 행
 
   // 서재 도서 목록 조회
   const fetchMyBooks = async () => {
@@ -79,6 +88,17 @@ export default function MyLibraryScreen({ navigation }) {
     }, [currentUserId])
   );
 
+  // 카드에서 완독일 저장: 성공하면 목록의 그 행만 바꾼다 (실패하면 예외를 던져 입력 폼이 안내문을 보여준다)
+  const handleSaveReadEndDate = async (date) => {
+    const target = dateTarget;
+    const res = await updateReadEndDate(target.id, date);
+    const saved = normalizeReadEndDate(res?.data?.read_end_date) || date;
+    const next = books.map((b) => (b.id === target.id ? { ...b, read_end_date: saved } : b));
+    setBooks(next);
+    applyFilter(next, selectedFilter);
+    setDateTarget(null);
+  };
+
   // 도서 카드 아이템 렌더링
   const renderBookItem = ({ item }) => {
     const rawCover = item.cover_url || item.thumbnail || item.cover_image;
@@ -109,6 +129,18 @@ export default function MyLibraryScreen({ navigation }) {
               {item.status === 'WISH' ? '📖 읽고 싶은' : item.status === 'COMPLETED' ? '✅ 완독' : '📚 읽는 중'}
             </Text>
           </View>
+          {isCompleted(item) ? (
+            normalizeReadEndDate(item.read_end_date) ? (
+              <Text style={styles.readEndText}>완독일 {normalizeReadEndDate(item.read_end_date)}</Text>
+            ) : (
+              <View style={styles.readEndRow}>
+                <Text style={styles.readEndEmptyText}>완독일 미입력</Text>
+                <TouchableOpacity onPress={() => setDateTarget(item)} hitSlop={8}>
+                  <Text style={styles.readEndInputText}>입력</Text>
+                </TouchableOpacity>
+              </View>
+            )
+          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -163,6 +195,31 @@ export default function MyLibraryScreen({ navigation }) {
           columnWrapperStyle={styles.columnWrapper}
         />
       )}
+
+      {/* 완독일 입력 (완독일이 비어 있는 옛 완독 책용) */}
+      <Modal
+        visible={dateTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDateTarget(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>완독일 입력</Text>
+            <Text style={styles.modalBook} numberOfLines={1}>
+              {dateTarget?.title}
+            </Text>
+            {dateTarget ? (
+              <ReadEndDateEditor
+                key={dateTarget.id}
+                initialValue={null}
+                onSave={handleSaveReadEndDate}
+                onCancel={() => setDateTarget(null)}
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -207,4 +264,13 @@ const styles = StyleSheet.create({
   bookAuthor: { fontSize: 11, color: '#8C827A' },
   statusBadge: { marginTop: 4, alignSelf: 'flex-start' },
   statusBadgeText: { fontSize: 10, color: '#5C3D2E', fontWeight: '600' },
+  readEndText: { fontSize: 10, color: COLORS.textSecondary, marginTop: 2 },
+  readEndRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  readEndEmptyText: { fontSize: 10, color: COLORS.textSecondary },
+  readEndInputText: { fontSize: 10, fontWeight: 'bold', color: COLORS.primary },
+  // 키보드가 올라와도 입력칸이 가려지지 않게 카드를 화면 위쪽에 둔다
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(25,25,25,0.4)', justifyContent: 'flex-start', paddingTop: 90, paddingHorizontal: 20 },
+  modalCard: { backgroundColor: COLORS.cardBackground, borderRadius: 16, padding: 16 },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary },
+  modalBook: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4, marginBottom: 12 },
 });

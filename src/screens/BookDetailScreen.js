@@ -8,17 +8,29 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { addUserBook, updateUserBookStatus, deleteUserBook, getUserBooks } from '../api';
 import { AuthContext } from '../context/AuthContext'; // 👈 AuthContext 불러오기
 import BookCommentPreview from '../components/BookCommentPreview';
 import BookDescriptionSection from '../components/BookDescriptionSection';
 import RelatedBooksSection from '../components/RelatedBooksSection';
+import ReadingRecordSection from '../components/ReadingRecordSection';
+import BookNoteSection from '../components/BookNoteSection';
+import useKeyboardPadding from '../hooks/useKeyboardPadding';
 import { getIsbn13 } from '../utils/isbn';
 import { toDetailBook } from '../utils/bookShape';
+import { normalizeReadEndDate } from '../utils/readEndDate';
 import { recordRecentBook } from '../storage/recentBooksStorage';
+
+// 스택 헤더 기본 높이(iOS). 댓글 화면과 같은 값으로, KeyboardAvoidingView가 헤더 아래에 있어서 보정한다.
+const IOS_HEADER_HEIGHT = 44;
+const isIOS = Platform.OS === 'ios';
+// iOS는 KeyboardAvoidingView, Android는 일반 View (Android는 useKeyboardPadding으로 여백을 직접 준다)
+const KeyboardWrapper = isIOS ? KeyboardAvoidingView : View;
 
 // TODO: 「민음사에서 보기」 링크 주소가 정해지면 여기에 넣고 Linking.openURL로 연결한다.
 const MINUMSA_URL = null;
@@ -49,6 +61,10 @@ export default function BookDetailScreen({ route, navigation }) {
   const [dbBookId, setDbBookId] = useState(rawParamsBook.id || targetBook?.id || null);
   const [currentStatus, setCurrentStatus] = useState(rawParamsBook.status || targetBook?.status || null);
   const [isSaved, setIsSaved] = useState(Boolean(rawParamsBook.id || targetBook?.id || rawParamsBook.status));
+  // 완독일 ('YYYY-MM-DD' 또는 null). 서재/MY에서 온 책은 route param 행에 들어 있고, 아니면 아래 서재 매칭에서 채운다.
+  const [readEndDate, setReadEndDate] = useState(
+    normalizeReadEndDate(rawParamsBook.read_end_date || targetBook?.read_end_date)
+  );
 
   // 화면 진입 시 내 서재 중복/상태 확인
   useEffect(() => {
@@ -73,6 +89,7 @@ export default function BookDetailScreen({ route, navigation }) {
         if (matched) {
           setDbBookId(matched.id);
           setCurrentStatus(matched.status);
+          setReadEndDate(normalizeReadEndDate(matched.read_end_date));
           setIsSaved(true);
         }
       } catch (error) {
@@ -109,6 +126,12 @@ export default function BookDetailScreen({ route, navigation }) {
   const trackSection = (name) => (e) => {
     sectionY.current[name] = e.nativeEvent.layout.y;
   };
+
+  // 키보드: 댓글 화면과 같은 방식 (iOS는 KeyboardAvoidingView, Android는 useKeyboardPadding으로 여백을 직접 계산)
+  const insets = useSafeAreaInsets();
+  const keyboardPadding = useKeyboardPadding();
+  // 입력칸에 포커스가 가면 키보드가 올라온 뒤 그 영역으로 스크롤한다
+  const focusSection = (name) => () => setTimeout(() => scrollToSection(name), 300);
 
   if (!title) {
     return (
@@ -176,24 +199,39 @@ export default function BookDetailScreen({ route, navigation }) {
   const yearText = yearMatch ? `${yearMatch[1]}년` : '정보 없음';
 
   // 독서 상태 변경 및 서재 저장 처리
-  const handleStatusChange = async (newStatus) => {
+  const handleStatusChange = async (newStatus, confirmed = false) => {
     if (!currentUserId) {
       Alert.alert('알림', '로그인이 필요한 기능입니다.');
       return;
     }
 
+    // 완독일이 있는 책을 완독이 아닌 상태로 바꾸면 서버가 완독일을 지우므로 먼저 확인한다
+    if (!confirmed && isSaved && dbBookId && currentStatus === 'COMPLETED' && newStatus !== 'COMPLETED' && readEndDate) {
+      Alert.alert('독서 상태 변경', `완독이 아닌 상태로 바꾸면 완독일(${readEndDate})이 지워져요. 바꿀까요?`, [
+        { text: '취소', style: 'cancel' },
+        { text: '바꾸기', onPress: () => handleStatusChange(newStatus, true) },
+      ]);
+      return;
+    }
+
     try {
       setLoading(true);
+      let result = null; // 서버가 돌려준 행 (완독일이 들어 있다)
       if (isSaved && dbBookId) {
-        await updateUserBookStatus(dbBookId, newStatus);
+        const updated = await updateUserBookStatus(dbBookId, newStatus);
+        result = updated?.data || null;
       } else {
         // 💡 내 서재에 추가 (요청자는 서버가 토큰으로 확인)
         const response = await addUserBook(targetBook, newStatus);
         const newId = response?.id || response?.data?.id;
         if (newId) setDbBookId(newId);
         setIsSaved(true);
+        result = response?.data && typeof response.data === 'object' ? response.data : null;
       }
       setCurrentStatus(newStatus);
+      // 완독일: 서버 응답에 있으면 그 값, 완독이 아니면 지워진 것, 응답에 없으면 그대로 둔다
+      if (result && 'read_end_date' in result) setReadEndDate(normalizeReadEndDate(result.read_end_date));
+      else if (newStatus !== 'COMPLETED') setReadEndDate(null);
       const statusKor = newStatus === 'WISH' ? '읽고 싶은' : newStatus === 'COMPLETED' ? '완독' : '읽는 중';
       Alert.alert('성공', `독서 상태가 [${statusKor}] (으)로 변경되었습니다.`);
     } catch (error) {
@@ -207,7 +245,7 @@ export default function BookDetailScreen({ route, navigation }) {
   // 서재에서 삭제 처리
   const handleDelete = () => {
     if (!dbBookId) return;
-    Alert.alert('서재 삭제', `'${title}'을(를) 서재에서 삭제하시겠습니까?`, [
+    Alert.alert('서재 삭제', `'${title}'을(를) 서재에서 삭제하시겠습니까?\n이 책의 메모도 함께 삭제됩니다.`, [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제',
@@ -231,7 +269,17 @@ export default function BookDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.scrollContent}>
+      <KeyboardWrapper
+        style={[styles.flex, !isIOS && { paddingBottom: keyboardPadding.padding }]}
+        {...(isIOS
+          ? { behavior: 'padding', keyboardVerticalOffset: insets.top + IOS_HEADER_HEIGHT }
+          : { onLayout: keyboardPadding.onLayout })}
+      >
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* 상단 뒤로가기 헤더 */}
         <TouchableOpacity style={styles.headerBack} onPress={() => navigation.goBack()}>
           <Text style={styles.headerBackText}>&lt; 뒤로</Text>
@@ -350,6 +398,24 @@ export default function BookDetailScreen({ route, navigation }) {
           )}
         </View>
 
+        {/* 독서 기록(완독일)과 메모: 서재에 저장된 책일 때만. 저장 여부는 기존 isSaved/dbBookId 판정을 그대로 쓴다 */}
+        {isSaved && dbBookId ? (
+          <>
+            <View onLayout={trackSection('record')}>
+              <ReadingRecordSection
+                userBookId={dbBookId}
+                status={currentStatus}
+                readEndDate={readEndDate}
+                onReadEndDateChange={setReadEndDate}
+                onFocusInput={focusSection('record')}
+              />
+            </View>
+            <View onLayout={trackSection('note')}>
+              <BookNoteSection userBookId={dbBookId} onFocusInput={focusSection('note')} />
+            </View>
+          </>
+        ) : null}
+
         {/* 줄거리 / 상세 소개 */}
         <View onLayout={trackSection('description')}>
           <BookDescriptionSection
@@ -376,12 +442,14 @@ export default function BookDetailScreen({ route, navigation }) {
           />
         </View>
       </ScrollView>
+      </KeyboardWrapper>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background || '#F7F4EB' },
+  flex: { flex: 1 },
   scrollContent: { padding: 20 },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   errorText: { fontSize: 16, color: '#8C827A', marginBottom: 16 },

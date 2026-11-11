@@ -1,85 +1,73 @@
-import React, { useState, useCallback, useContext } from 'react';
+import React, { useState, useCallback, useContext, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   TouchableOpacity,
   ScrollView,
-  Image,
   ActivityIndicator,
   Alert, // 👈 [추가] 로그아웃 확인 팝업용 Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../constants/theme';
-import { getUserBooks } from '../api';
+import { getUserBooksSummary } from '../api';
 import { AuthContext } from '../context/AuthContext'; // 👈 AuthContext 불러오기
+import BookCover, { toHttps } from '../components/BookCover';
+import { getRecentBooks } from '../storage/recentBooksStorage';
+import { recentToDetailBook } from '../utils/bookShape';
+import { normalizeReadEndDate } from '../utils/readEndDate';
+
+const RECENT_COUNT = 5;
+const CARD_WIDTH = 80;
+const CARD_COVER_HEIGHT = 115;
+
+function StatBox({ value, label }) {
+  return (
+    <View style={styles.statBox}>
+      <Text style={styles.statNumber}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
 
 export default function MyScreen({ navigation }) {
   // 💡 AuthContext에서 logout 함수 추가 추출
-  const { user, logout } = useContext(AuthContext); 
+  const { user, logout } = useContext(AuthContext);
   const currentUserId = user?.id; // DB 고유 유저 ID (UUID)
 
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    total: 0,
-    reading: 0,
-    completed: 0,
-    wish: 0,
-  });
-  const [recentBooks, setRecentBooks] = useState([]);
+  const [error, setError] = useState(false);
+  const [counts, setCounts] = useState(null); // summary.counts
+  const [recentCompleted, setRecentCompleted] = useState([]); // summary.recent_completed
+  const [recentViewed, setRecentViewed] = useState([]); // 기기에 저장된 최근 본 책
+  const requestIdRef = useRef(0); // 늦게 온 이전 응답을 버리기 위한 요청 번호
 
-  // 서재 데이터 기반 통계 계산 및 최신 도서 추출
+  // 서버 요약(통계, 최근 완독)과 기기의 최근 본 책을 불러온다
   const fetchMyData = async () => {
+    const requestId = ++requestIdRef.current;
     if (!currentUserId) {
       setLoading(false);
       return;
     }
 
+    setLoading(true);
+    setError(false);
+    // 최근 본 책은 서버와 상관없이 항상 읽는다 (읽기에 실패하면 빈 목록)
+    getRecentBooks(currentUserId).then((list) => {
+      if (requestId === requestIdRef.current) setRecentViewed(list.slice(0, RECENT_COUNT));
+    });
+
     try {
-      setLoading(true);
-      const data = await getUserBooks();
-
-      let bookList = [];
-      if (data && Array.isArray(data)) {
-        bookList = data;
-      } else if (data && data.books && Array.isArray(data.books)) {
-        bookList = data.books;
-      } else if (data && data.data && Array.isArray(data.data)) {
-        bookList = data.data;
-      }
-
-      // 독서 상태별 카운팅
-      let readingCount = 0;
-      let completedCount = 0;
-      let wishCount = 0;
-
-      bookList.forEach((book) => {
-        const status = (book.status || '').toUpperCase();
-        if (status === 'READING' || status === '읽는 중') {
-          readingCount += 1;
-        } else if (status === 'COMPLETED' || status === 'FINISHED' || status === '완독') {
-          completedCount += 1;
-        } else if (status === 'WISH' || status === 'WANT_TO_READ' || status === '읽고 싶은') {
-          wishCount += 1;
-        } else {
-          readingCount += 1; // 기본값
-        }
-      });
-
-      setStats({
-        total: bookList.length,
-        reading: readingCount,
-        completed: completedCount,
-        wish: wishCount,
-      });
-
-      // 최근 추가한 도서 상위 5개
-      setRecentBooks(bookList.slice(0, 5));
-    } catch (error) {
-      console.error('마이페이지 데이터 조회 실패:', error);
+      const res = await getUserBooksSummary(RECENT_COUNT);
+      if (requestId !== requestIdRef.current) return;
+      setCounts(res?.data?.counts || null);
+      setRecentCompleted(Array.isArray(res?.data?.recent_completed) ? res.data.recent_completed : []);
+    } catch (e) {
+      if (requestId !== requestIdRef.current) return;
+      setError(true);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   };
 
@@ -99,8 +87,31 @@ export default function MyScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchMyData();
+      return () => {
+        requestIdRef.current += 1; // 화면을 떠나면 진행 중인 응답은 무시한다
+      };
     }, [currentUserId])
   );
+
+  // 최근 완독한 책은 서재 행(user_books)이라 서재에서 열 때와 같은 모양으로 넘긴다 (id = user_books.id)
+  const openCompleted = (item) => {
+    navigation.navigate('BookDetail', {
+      book: {
+        id: item.id,
+        title: item.title,
+        author: item.author,
+        isbn: item.isbn,
+        cover_image: item.cover_image,
+        status: 'COMPLETED',
+        read_end_date: item.read_end_date,
+      },
+    });
+  };
+
+  // 최근 본 책은 id 없이 열린다 (기록에는 isbn, title, author, thumbnail만 있다)
+  const openViewed = (entry) => {
+    navigation.navigate('BookDetail', { book: recentToDetailBook(entry) });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -127,78 +138,114 @@ export default function MyScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* 독서 통계 요약 카드 */}
+        {/* 독서 통계 요약 카드 (GET /user-books/summary) */}
         <Text style={styles.sectionTitle}>독서 기록 요약</Text>
-        {loading ? (
+        {loading && !counts ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color={COLORS.primary || '#5C3D2E'} />
+            <ActivityIndicator size="small" color={COLORS.primary} />
           </View>
+        ) : error && !counts ? (
+          <TouchableOpacity style={styles.errorBox} onPress={fetchMyData} activeOpacity={0.8}>
+            <Text style={styles.emptyRecentText}>독서 기록을 불러오지 못했어요.</Text>
+            <Text style={styles.retryText}>다시 시도</Text>
+          </TouchableOpacity>
         ) : (
-          <View style={styles.statsCardContainer}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.total}</Text>
-              <Text style={styles.statLabel}>전체 수집</Text>
+          <View style={styles.statsCard}>
+            <View style={styles.statsRow}>
+              <StatBox value={counts?.total ?? 0} label="전체 수집" />
+              <View style={styles.statDivider} />
+              <StatBox value={counts?.reading ?? 0} label="읽는 중" />
+              <View style={styles.statDivider} />
+              <StatBox value={counts?.wish ?? 0} label="읽고 싶은" />
             </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.reading}</Text>
-              <Text style={styles.statLabel}>읽는 중</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.completed}</Text>
-              <Text style={styles.statLabel}>완독</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{stats.wish}</Text>
-              <Text style={styles.statLabel}>읽고 싶은</Text>
+            <View style={styles.statsRowGap} />
+            <View style={styles.statsRow}>
+              <StatBox value={counts?.completed ?? 0} label="완독" />
+              <View style={styles.statDivider} />
+              <StatBox value={counts?.completed_this_month ?? 0} label="이번 달 완독" />
+              <View style={styles.statDivider} />
+              <StatBox value={counts?.notes ?? 0} label="메모" />
             </View>
           </View>
         )}
 
-        {/* 최근 수집한 도서 리스트 */}
+        {/* 최근 완독한 책 */}
         <View style={styles.recentHeader}>
-          <Text style={styles.sectionTitle}>최근 담은 책</Text>
+          <Text style={styles.sectionTitle}>최근 완독한 책</Text>
           <TouchableOpacity onPress={() => navigation.navigate('MyLibrary')}>
             <Text style={styles.moreText}>내 서재 전체보기 &gt;</Text>
           </TouchableOpacity>
         </View>
 
-        {recentBooks.length === 0 ? (
+        {recentCompleted.length === 0 ? (
           <View style={styles.emptyRecentBox}>
-            <Text style={styles.emptyRecentText}>아직 서재에 담은 책이 없습니다.</Text>
+            <Text style={styles.emptyRecentText}>
+              {loading ? '불러오는 중...' : '아직 완독한 책이 없어요.'}
+            </Text>
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentScroll}>
-            {recentBooks.map((item, index) => {
-              const rawCover = item.cover_url || item.thumbnail || item.cover_image;
-              const cover = rawCover ? rawCover.replace('http://', 'https://') : null;
-              const title = item.title || '제목 없음';
-
+            {recentCompleted.map((item, index) => {
+              const readEnd = normalizeReadEndDate(item.read_end_date);
               return (
                 <TouchableOpacity
                   key={item.id?.toString() || index.toString()}
                   style={styles.recentBookCard}
                   activeOpacity={0.8}
-                  onPress={() => {
-                    console.log('📌 마이페이지에서 넘겨주는 데이터:', JSON.stringify(item, null, 2));
-                    navigation.navigate('BookDetail', { book: item });
-                  }}
+                  onPress={() => openCompleted(item)}
                 >
-                  {cover ? (
-                    <Image source={{ uri: cover }} style={styles.recentCover} resizeMode="cover" />
-                  ) : (
-                    <View style={[styles.recentCover, styles.recentCoverPlaceholder]}>
-                      <Text style={styles.recentCoverText} numberOfLines={2}>{title}</Text>
-                    </View>
-                  )}
-                  <Text style={styles.recentBookTitle} numberOfLines={1}>{title}</Text>
+                  <BookCover
+                    uri={toHttps(item.cover_image)}
+                    title={item.title}
+                    width={CARD_WIDTH}
+                    height={CARD_COVER_HEIGHT}
+                  />
+                  <Text style={styles.recentBookTitle} numberOfLines={1}>{item.title || '제목 없음'}</Text>
+                  <Text style={readEnd ? styles.recentDate : styles.recentDateEmpty} numberOfLines={1}>
+                    {readEnd || '완독일 미입력'}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         )}
+
+        {/* 최근 본 책 (기기에 저장된 기록) */}
+        <View style={[styles.recentHeader, styles.sectionGap]}>
+          <Text style={styles.sectionTitle}>최근 본 책</Text>
+        </View>
+
+        {recentViewed.length === 0 ? (
+          <View style={styles.emptyRecentBox}>
+            <Text style={styles.emptyRecentText}>최근 본 책이 없어요.</Text>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentScroll}>
+            {recentViewed.map((entry, index) => (
+              <TouchableOpacity
+                key={`${entry.isbn || entry.title}-${index}`}
+                style={styles.recentBookCard}
+                activeOpacity={0.8}
+                onPress={() => openViewed(entry)}
+              >
+                <BookCover
+                  uri={toHttps(entry.thumbnail)}
+                  title={entry.title}
+                  width={CARD_WIDTH}
+                  height={CARD_COVER_HEIGHT}
+                />
+                <Text style={styles.recentBookTitle} numberOfLines={1}>{entry.title}</Text>
+                <Text style={styles.recentDateEmpty} numberOfLines={1}>{entry.author || ''}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* AI 독서 리포트: 자리만 만들어 두고 비활성 */}
+        <View style={[styles.aiReportButton, styles.sectionGap]}>
+          <Text style={styles.aiReportText}>AI 독서 리포트</Text>
+          <Text style={styles.aiReportBadge}>준비 중</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -229,7 +276,7 @@ const styles = StyleSheet.create({
   avatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
   profileName: { fontSize: 18, fontWeight: 'bold', color: '#2B2118' },
   profileSub: { fontSize: 12, color: '#8C827A', marginTop: 4, textAlign: 'center' },
-  
+
   // 💡 [추가] 로그아웃 버튼 스타일
   logoutButton: {
     marginTop: 14,
@@ -245,9 +292,17 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#2B2118', marginBottom: 12 },
+  sectionGap: { marginTop: 28 },
   loadingContainer: { paddingVertical: 20, alignItems: 'center' },
-  statsCardContainer: {
-    flexDirection: 'row',
+  errorBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  retryText: { fontSize: 13, fontWeight: 'bold', color: COLORS.primary, marginTop: 8 },
+  statsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingVertical: 18,
@@ -258,9 +313,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
-    justifyContent: 'space-around',
-    alignItems: 'center',
   },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  statsRowGap: { height: 16 },
   statBox: { alignItems: 'center', flex: 1 },
   statNumber: { fontSize: 18, fontWeight: 'bold', color: '#5C3D2E' },
   statLabel: { fontSize: 11, color: '#8C827A', marginTop: 4 },
@@ -276,9 +331,20 @@ const styles = StyleSheet.create({
   },
   emptyRecentText: { fontSize: 13, color: '#8C827A' },
   recentScroll: { flexDirection: 'row', marginTop: 4 },
-  recentBookCard: { width: 80, marginRight: 12 },
-  recentCover: { width: 80, height: 115, borderRadius: 6 },
-  recentCoverPlaceholder: { backgroundColor: '#D9D0C1', justifyContent: 'center', alignItems: 'center', padding: 6 },
-  recentCoverText: { fontSize: 10, color: '#2B2118', textAlign: 'center', fontWeight: 'bold' },
+  recentBookCard: { width: CARD_WIDTH, marginRight: 12 },
   recentBookTitle: { fontSize: 12, color: '#2B2118', marginTop: 6, fontWeight: '500', textAlign: 'center' },
+  recentDate: { fontSize: 10, color: COLORS.textSecondary, marginTop: 2, textAlign: 'center' },
+  recentDateEmpty: { fontSize: 10, color: COLORS.textSecondary, marginTop: 2, textAlign: 'center' },
+  aiReportButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: COLORS.border,
+    opacity: 0.7,
+  },
+  aiReportText: { fontSize: 14, fontWeight: 'bold', color: COLORS.textSecondary },
+  aiReportBadge: { fontSize: 12, fontWeight: 'bold', color: COLORS.textSecondary },
 });
