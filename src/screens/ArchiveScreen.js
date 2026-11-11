@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { getBooks } from '../api';
 import { toDetailBook } from '../utils/bookShape';
+import BookCover, { toHttps } from '../components/BookCover';
 
 const CATEGORIES = [
   { label: '전체', value: undefined },
@@ -29,37 +29,9 @@ const SIDE_PADDING = 16;
 const GAP = 12;
 const PAGE_LIMIT = 30;
 
-const toHttps = (url) => (typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : '');
-
 function errorMessage(error) {
   if (error?.response?.status === 429) return '요청이 많아요. 잠시 후 다시 시도해 주세요.';
   return '책 목록을 불러오지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.';
-}
-
-// 표지가 없거나 불러오기에 실패하면 제목이 들어간 자리표시를 보여준다.
-function BookCover({ uri, title, width, height }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => {
-    setFailed(false);
-  }, [uri]);
-
-  if (!uri || failed) {
-    return (
-      <View style={[styles.cover, styles.coverPlaceholder, { width, height }]}>
-        <Text style={styles.placeholderText} numberOfLines={4}>
-          {title}
-        </Text>
-      </View>
-    );
-  }
-  return (
-    <Image
-      source={{ uri }}
-      style={[styles.cover, { width, height }]}
-      resizeMode="cover"
-      onError={() => setFailed(true)}
-    />
-  );
 }
 
 // 모음집 탭: 전체 도서 3열 그리드 (기획서 3.3)
@@ -288,9 +260,6 @@ const styles = StyleSheet.create({
   chipTextActive: { color: COLORS.background, fontWeight: 'bold' },
   listContent: { paddingHorizontal: SIDE_PADDING, paddingTop: 16, paddingBottom: 24, flexGrow: 1 },
   row: { columnGap: GAP, marginBottom: 20, justifyContent: 'flex-start' },
-  cover: { borderRadius: 4, backgroundColor: COLORS.border },
-  coverPlaceholder: { justifyContent: 'center', alignItems: 'center', padding: 8 },
-  placeholderText: { fontSize: 12, color: COLORS.secondary, textAlign: 'center' },
   bookTitle: { fontSize: 13, fontWeight: 'bold', color: COLORS.textPrimary, marginTop: 8 },
   bookAuthor: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   center: { flex: 1, minHeight: 240, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
