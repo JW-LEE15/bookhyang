@@ -160,8 +160,8 @@ export default function MyScreen({ navigation }) {
         {/* 최근 수집한 도서 리스트 */}
         <View style={styles.recentHeader}>
           <Text style={styles.sectionTitle}>최근 담은 책</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('모음집')}>
-            <Text style={styles.moreText}>모음집 보기 &gt;</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('MyLibrary')}>
+            <Text style={styles.moreText}>내 서재 전체보기 &gt;</Text>
           </TouchableOpacity>
         </View>
 
