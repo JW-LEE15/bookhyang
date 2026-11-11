@@ -206,6 +206,30 @@ export const deleteComment = async (commentId) => {
   }
 };
 
+// AI 독서 추천 API (로그인 필요). AI 응답이 느려서 이 요청만 timeout을 30초로 덮어쓴다.
+// taste: { genres, topics, moods, useHistory }
+// refresh: 「다시 추천」일 때만 true (처음 요청은 false)
+// 실패하면 예외를 던진다. 서버 오류 code는 error.response.data.code에 있다.
+export const getAiRecommendations = async (taste, { refresh = false } = {}) => {
+  try {
+    const response = await api.post(
+      '/ai/recommend',
+      {
+        genres: taste.genres,
+        topics: taste.topics,
+        moods: taste.moods,
+        useHistory: taste.useHistory === true,
+        refresh: refresh === true,
+      },
+      { timeout: 30000 }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('AI 추천 API 에러:', error.response?.data?.code || error.message);
+    throw error;
+  }
+};
+
 // 💡 [신규 추가] 6. 회원가입 API (POST /api/auth/signup)
 export const signupUser = async (email, password, nickname) => {
   try {

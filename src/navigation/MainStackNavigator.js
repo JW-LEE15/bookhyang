@@ -7,6 +7,8 @@ import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import BookDetailScreen from '../screens/BookDetailScreen';
 import MyLibraryScreen from '../screens/MyLibraryScreen';
+import AiTasteScreen from '../screens/AiTasteScreen';
+import AiRecommendResultScreen from '../screens/AiRecommendResultScreen';
 import BookCommentsScreen from '../screens/BookCommentsScreen';
 import LegalDocumentScreen from '../screens/LegalDocumentScreen';
 import BottomTabNavigator from './BottomTabNavigator';
@@ -40,6 +42,16 @@ export default function MainStackNavigator() {
             name="MyLibrary"
             component={MyLibraryScreen}
             options={{ headerShown: true, title: '내 서재' }}
+          />
+          <Stack.Screen
+            name="AiTaste"
+            component={AiTasteScreen}
+            options={{ headerShown: true, title: 'AI 독서 추천' }}
+          />
+          <Stack.Screen
+            name="AiRecommendResult"
+            component={AiRecommendResultScreen}
+            options={{ headerShown: true, title: '추천 결과' }}
           />
           <Stack.Screen
             name="BookComments"

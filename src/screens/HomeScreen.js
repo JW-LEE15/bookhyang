@@ -27,7 +27,7 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
 
         {/* 3. AI 추천 진입 배너 (신규 추가: 13주차 AI 기능 연결용) */}
-        <TouchableOpacity style={styles.aiBanner}>
+        <TouchableOpacity style={styles.aiBanner} onPress={() => navigation.navigate('AiTaste')}>
           <Text style={styles.aiBannerBadge}>AI 취향 분석</Text>
           <Text style={styles.aiBannerTitle}>나만의 독서 페르소나와 맞춤 책 찾기 →</Text>
         </TouchableOpacity>
