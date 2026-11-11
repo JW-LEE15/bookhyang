@@ -132,14 +132,14 @@
 
 | 영역 | 기술 |
 | --- | --- |
-| Frontend | [작성 예정] |
-| Backend | [작성 예정] |
-| Database | [작성 예정] |
-| Navigation / State | [작성 예정] |
-| Authentication | [작성 예정] |
-| External API | [작성 예정] |
-| Deployment / Build | [작성 예정] |
-| Design / Collaboration | [작성 예정] |
+| Frontend | React Native (Expo SDK 58), JavaScript, axios |
+| Backend | Node.js, Express |
+| Database | Supabase (PostgreSQL), `pg`로 직접 연결 |
+| Navigation / State | React Navigation (하단 탭 + 스택), React Context (AuthContext), AsyncStorage |
+| Authentication | 이메일/비밀번호 가입·로그인, bcrypt, JWT (만료 7일), 토큰은 expo-secure-store에 저장 |
+| External API | 카카오 도서 검색 API, Google Gemini API (AI 기능 개발 중) |
+| Deployment / Build | Render (백엔드), EAS Build (안드로이드 APK, preview 프로필) |
+| Design / Collaboration | GitHub |
 
 ---
 
@@ -161,18 +161,20 @@
 
 | 구분 | 연동 대상 / 역할 |
 | --- | --- |
-| [구성 요소 1] | [작성 예정] |
-| [구성 요소 2] | [작성 예정] |
-| [구성 요소 3] | [작성 예정] |
+| 앱 ↔ 백엔드 | 앱이 axios로 `https://<서버주소>/api`의 REST API(`/auth`, `/books/search`, `/user-books`, `/comments`)를 호출. 로그인 후에는 JWT를 `Authorization: Bearer` 헤더로 전달하며, 도서 검색과 댓글 조회는 로그인 없이 호출 가능 |
+| 백엔드 ↔ Supabase | 백엔드가 `pg` 커넥션 풀로 Supabase PostgreSQL에 직접 연결해 회원, 서재, 댓글 데이터를 저장·조회 |
+| 백엔드 ↔ 카카오 도서 API | 백엔드가 카카오 도서 검색 API를 호출하고 출판사에 '민음사'가 포함된 결과만 앱에 전달 (앱은 카카오 API를 직접 호출하지 않음) |
 
 ### 시스템 흐름
 
 ```text
-[앱 / 클라이언트]
-├── [연동 대상 1]
-│   └── [역할]
-└── [연동 대상 2]
-    └── [역할]
+앱 (React Native / Expo)
+└── Render 서버 (Express, https://<서버주소>/api)
+    ├── Supabase DB (PostgreSQL)
+    │   └── 회원, 서재, 댓글 데이터 저장·조회
+    ├── 카카오 도서 API
+    │   └── 민음사 도서 검색
+    └── AI 호출 (Google Gemini API): 개발 중
 ```
 
 ---
@@ -181,11 +183,23 @@
 
 ```text
 bookhyang/
-├── [폴더 1]/
-│   └── [하위 항목]
-├── [폴더 2]/
-├── [폴더 3]/
-├── [설정 파일]
+├── assets/
+├── src/
+│   ├── api/
+│   ├── components/
+│   ├── constants/
+│   ├── context/
+│   ├── hooks/
+│   ├── navigation/
+│   ├── screens/
+│   ├── storage/
+│   └── utils/
+├── App.js
+├── index.js
+├── app.json
+├── eas.json
+├── package.json
+├── .env.example
 └── README.md
 ```
 
@@ -193,9 +207,9 @@ bookhyang/
 
 | 디렉터리 | 설명 |
 | --- | --- |
-| [폴더 1] | [작성 예정] |
-| [폴더 2] | [작성 예정] |
-| [폴더 3] | [작성 예정] |
+| src/ | 앱 소스 코드. `api`(서버 요청과 로그인 토큰 처리), `components`(댓글 미리보기, 댓글 항목, 키보드 대응 컨테이너), `constants`(테마 값, 이용약관·개인정보 처리방침 초안 문구), `context`(로그인 상태를 담은 AuthContext), `hooks`(안드로이드 키보드 여백 계산), `navigation`(하단 탭과 스택 화면 구성), `storage`(기기에 설정값 저장), `utils`(ISBN 변환, 작성 시간 표시) |
+| src/screens/ | 화면 컴포넌트. 홈, 모음집, 검색, 책 상세, 책별 댓글, 로그인, 회원가입, MY, 설정, 이용약관·개인정보 처리방침 화면 |
+| assets/ | 앱 아이콘, 적응형 아이콘, 스플래시, 파비콘 이미지 |
 
 ---
 
@@ -228,25 +242,81 @@ bookhyang/
 
 ### 사전 요구 사항
 
-[작성해주세용]
+- Node.js 24.x (개발·테스트 환경, 백엔드는 22 이상 25 미만)
+- npm
+- Git
+- Expo Go 앱 (또는 안드로이드 기기)
 
 ### 프로젝트 설치
 
 ```bash
-# 설치 명령어
+# 저장소 받기
+git clone https://github.com/JW-LEE15/bookhyang.git
+cd bookhyang
+
+# 패키지 설치
+npm install
 ```
 
 ### 환경 변수 설정
 
 ```bash
-# 환경 변수 및 설정 방법
+# 프로젝트 루트에 .env 파일을 만들고 서버 주소를 설정합니다. (.env.example 참고)
+EXPO_PUBLIC_API_URL=https://<서버주소>/api
 ```
+
+- 서버 주소는 `/api`까지 포함해서 입력합니다.
+- `.env` 파일은 `.gitignore`에 포함되어 있어 Git에 올라가지 않습니다.
 
 ### 프로젝트 실행
 
 ```bash
-# 실행 명령어
+# 개발 서버 실행
+npx expo start
+
+# 캐시 문제가 있을 때
+npx expo start -c
 ```
+
+터미널에 표시되는 QR 코드를 휴대폰의 Expo Go 앱으로 스캔해 접속합니다.
+
+### 설치형 안드로이드 APK 빌드
+
+Expo 계정과 EAS CLI(`eas`)가 필요하며, `eas.json`의 `preview` 프로필이 APK를 만듭니다. 서버 주소는 `eas.json`에 적지 않고 EAS 환경변수로 등록합니다.
+
+```bash
+# Expo 계정 로그인
+eas login
+
+# 서버 주소를 EAS 환경변수(preview)로 등록
+eas env:set preview --name EXPO_PUBLIC_API_URL --value "https://<서버주소>/api" --visibility plaintext
+
+# 안드로이드 APK 빌드 (preview 프로필)
+eas build -p android --profile preview
+```
+
+### 백엔드 서버 (별도 레포)
+
+백엔드는 별도 레포 [bookhyang-backend](https://github.com/JW-LEE15/bookhyang-backend)에서 관리합니다.
+
+```bash
+git clone https://github.com/JW-LEE15/bookhyang-backend.git
+cd bookhyang-backend
+npm install
+
+# 개발 실행 (nodemon)
+npm run dev
+
+# 실행
+npm start
+```
+
+백엔드 `.env`에 설정하는 변수 이름은 다음과 같습니다. (값은 직접 입력하며 Git에 올리지 않습니다)
+
+- `PORT`
+- `DATABASE_URL`
+- `JWT_SECRET` (32자 이상)
+- `KAKAO_API_KEY`
 
 ---
 
