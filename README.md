@@ -193,8 +193,6 @@
 <p align="center">
   <img src="./assets/architecture.png" alt="북향 시스템 아키텍처" width="100%" />
 </p>
-assets
-
 
 ### API 연동
 
