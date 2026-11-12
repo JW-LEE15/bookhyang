@@ -190,14 +190,10 @@
 
 ### 시스템 아키텍처
 
-
 <p align="center">
-  <img
-    src="./docs/images/architecture.png"
-    alt="북향 시스템 아키텍처"
-    width="100%"
-  />
+  <img src="./assets/architecture.png" alt="북향 시스템 아키텍처" width="100%" />
 </p>
+assets
 
 
 ### API 연동
