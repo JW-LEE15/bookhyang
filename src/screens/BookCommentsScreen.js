@@ -28,6 +28,9 @@ import { COMMENT_ERROR_MESSAGES, getCommentErrorCode, getCommentErrorMessage } f
 
 const PAGE_SIZE = 20;
 const REPLY_PAGE_SIZE = 20;
+// AI 요약에서 원문 이동할 때 댓글을 찾느라 불러오는 최대 페이지 수 (처음 페이지 포함)
+const FOCUS_MAX_PAGES = 5;
+const FOCUS_NOT_FOUND_TEXT = '원문 댓글을 찾지 못했어요. 삭제됐거나 오래된 댓글일 수 있어요';
 const CONTENT_MAX_LENGTH = 500;
 // 스택 헤더 기본 높이(iOS). KeyboardAvoidingView가 헤더만큼 아래에 있어서 그만큼 보정한다.
 const IOS_HEADER_HEIGHT = 44;
@@ -42,8 +45,8 @@ const charLength = (str) => [...str].length;
 const KeyboardWrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
 
 // 책별 댓글 화면. 책은 ISBN13(route.params.isbn13)로만 식별한다. 책 id는 쓰지 않는다.
-export default function BookCommentsScreen({ route }) {
-  const { isbn13, title } = route.params || {};
+export default function BookCommentsScreen({ route, navigation }) {
+  const { isbn13, title, focusCommentId, focusOpenReplies } = route.params || {};
   const { user } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
   const listRef = useRef(null);
@@ -72,6 +75,12 @@ export default function BookCommentsScreen({ route }) {
   const [repliesByParent, setRepliesByParent] = useState({}); // { [원댓글 id]: 답글 목록 상태 }
   const repliesLoadingRef = useRef({});
   const [revealedSpoilers, setRevealedSpoilers] = useState({}); // { [댓글 id]: true } 화면을 나가면 다시 가려진다
+
+  // AI 요약에서 넘어온 원문 댓글 찾기
+  const focusDoneRef = useRef(!focusCommentId);
+  const focusPagesRef = useRef(1);
+  const [highlightedId, setHighlightedId] = useState(null);
+  const [focusNotice, setFocusNotice] = useState(null);
 
   // 서버 is_mine을 우선, 없을 때만 응답의 user_id와 로그인한 내 user.id를 비교
   const isMineComment = (item) => {
@@ -189,6 +198,43 @@ export default function BookCommentsScreen({ route }) {
     }
     patchReplies(parent.id, { open: true });
     if (!cur.loaded) fetchReplies(parent.id);
+  };
+
+  // ---- 원문 댓글 찾기 (AI 댓글 요약에서 이동한 경우) ----
+  // 목록에 없으면 최대 FOCUS_MAX_PAGES페이지까지 이어 받으며 찾는다. 찾으면 스크롤하고, 답글 근거였다면 답글을 펼친다.
+  useEffect(() => {
+    if (focusDoneRef.current || status !== 'ready' || loadingMore) return;
+    const index = comments.findIndex((c) => String(c.id) === String(focusCommentId));
+    if (index >= 0) {
+      focusDoneRef.current = true;
+      setHighlightedId(comments[index].id);
+      if (focusOpenReplies) {
+        const cur = repliesByParent[comments[index].id] || EMPTY_REPLIES;
+        if (!cur.open) {
+          patchReplies(comments[index].id, { open: true });
+          if (!cur.loaded) fetchReplies(comments[index].id);
+        }
+      }
+      requestAnimationFrame(() =>
+        listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 })
+      );
+      return;
+    }
+    if (nextCursor && focusPagesRef.current < FOCUS_MAX_PAGES) {
+      focusPagesRef.current += 1;
+      loadMore();
+      return;
+    }
+    focusDoneRef.current = true;
+    setFocusNotice(FOCUS_NOT_FOUND_TEXT);
+  }, [status, comments, nextCursor, loadingMore]);
+
+  // 렌더 전에 높이를 모르는 항목으로 스크롤하다 실패하면, 평균 높이로 근처까지 가 본다
+  const handleScrollToIndexFailed = (info) => {
+    listRef.current?.scrollToOffset({
+      offset: info.averageItemLength * info.index,
+      animated: true,
+    });
   };
 
   // ---- 작성 ----
@@ -401,7 +447,7 @@ export default function BookCommentsScreen({ route }) {
   };
 
   const renderItem = ({ item }) => (
-    <View>
+    <View style={highlightedId === item.id ? styles.highlighted : null}>
       {renderComment(item)}
       {renderReplies(item)}
     </View>
@@ -449,6 +495,16 @@ export default function BookCommentsScreen({ route }) {
             <View style={styles.listHeader}>
               <Text style={styles.bookTitle} numberOfLines={2}>{title || '댓글'}</Text>
               {status === 'ready' ? <Text style={styles.totalText}>댓글 {total}개</Text> : null}
+              {status === 'ready' && total > 0 ? (
+                <TouchableOpacity
+                  style={styles.aiButton}
+                  onPress={() => navigation.navigate('AiCommentSummary', { isbn13, title })}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.aiButtonText}>AI 댓글 요약</Text>
+                </TouchableOpacity>
+              ) : null}
+              {focusNotice ? <Text style={styles.focusNotice}>{focusNotice}</Text> : null}
             </View>
           }
           ListEmptyComponent={renderEmpty}
@@ -462,6 +518,7 @@ export default function BookCommentsScreen({ route }) {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContent}
           onScroll={handleScroll}
+          onScrollToIndexFailed={handleScrollToIndexFailed}
           scrollEventThrottle={16}
         />
 
@@ -535,6 +592,17 @@ const styles = StyleSheet.create({
   listHeader: { paddingTop: 16, paddingBottom: 8 },
   bookTitle: { fontSize: 17, fontWeight: 'bold', color: COLORS.textPrimary },
   totalText: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4 },
+  aiButton: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+  },
+  aiButtonText: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
+  focusNotice: { fontSize: 12, color: COLORS.secondary, marginTop: 8 },
+  highlighted: { backgroundColor: '#F7F4EB', borderRadius: 8 },
   separator: { height: 1, backgroundColor: COLORS.border },
   infoText: { fontSize: 14, color: COLORS.textSecondary, paddingVertical: 24, textAlign: 'center' },
   loading: { marginVertical: 24 },

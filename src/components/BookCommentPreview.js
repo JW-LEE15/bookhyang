@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { COLORS } from '../constants/theme';
 import { getComments } from '../api';
 import CommentItem from './CommentItem';
@@ -11,7 +11,8 @@ const PREVIEW_COUNT = 2;
 
 // 책 상세의 댓글 미리보기: 최신 댓글 1~2개, 전체 댓글 수, "댓글 전체보기" 버튼.
 // 책 식별은 ISBN13만 쓴다 (isbn13이 없으면 댓글을 쓸 수 없다고 안내).
-export default function BookCommentPreview({ isbn13, onPressViewAll }) {
+export default function BookCommentPreview({ isbn13, title, onPressViewAll }) {
+  const navigation = useNavigation();
   const [comments, setComments] = useState([]);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
@@ -93,6 +94,17 @@ export default function BookCommentPreview({ isbn13, onPressViewAll }) {
       <TouchableOpacity style={styles.viewAllButton} onPress={onPressViewAll} activeOpacity={0.8}>
         <Text style={styles.viewAllText}>댓글 전체보기</Text>
       </TouchableOpacity>
+
+      {/* 댓글이 있을 때만 (ISBN이 없으면 위에서 이미 반환) */}
+      {status === 'ready' && total > 0 ? (
+        <TouchableOpacity
+          style={styles.aiButton}
+          onPress={() => navigation.navigate('AiCommentSummary', { isbn13, title })}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.aiButtonText}>AI 댓글 요약</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -119,4 +131,12 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   viewAllText: { fontSize: 13, fontWeight: 'bold', color: COLORS.primary },
+  aiButton: {
+    marginTop: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+  },
+  aiButtonText: { fontSize: 13, fontWeight: 'bold', color: '#FFFFFF' },
 });

@@ -358,6 +358,28 @@ export const getAiRecommendations = async (taste, { refresh = false } = {}) => {
   }
 };
 
+// AI 댓글 요약 API (로그인 필요). AI 응답이 느려서 이 요청만 timeout을 30초로 덮어쓴다.
+// isbn: ISBN13. includeSpoilers: 스포일러 댓글도 요약에 포함. refresh: 「다시 요약」일 때만 true
+// 성공 응답: { success, data: { isbn, includeSpoilers, cached, generatedAt, counts, summary, comments } }
+// 실패하면 예외를 던진다. 서버 오류 code는 error.response.data.code에 있다. (401은 code가 없다)
+export const getAiCommentSummary = async (isbn, { includeSpoilers = false, refresh = false } = {}) => {
+  try {
+    const response = await api.post(
+      '/ai/comment-summary',
+      {
+        isbn,
+        includeSpoilers: includeSpoilers === true,
+        refresh: refresh === true,
+      },
+      { timeout: 30000 }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('AI 댓글 요약 API 에러:', error.response?.data?.code || error.message);
+    throw error;
+  }
+};
+
 // 💡 [신규 추가] 6. 회원가입 API (POST /api/auth/signup)
 export const signupUser = async (email, password, nickname) => {
   try {
