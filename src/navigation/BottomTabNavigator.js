@@ -51,10 +51,10 @@ export default function BottomTabNavigator() {
       })}
     >
       <Tab.Screen name="홈" component={HomeScreen} />
-      <Tab.Screen name="커뮤니티" component={TempCommunity} />
-      <Tab.Screen name="모음집" component={ArchiveScreen} />
       <Tab.Screen name="검색" component={SearchScreen} />
+      <Tab.Screen name="모음집" component={ArchiveScreen} />
       <Tab.Screen name="MY" component={MyScreen} />
+      <Tab.Screen name="커뮤니티" component={TempCommunity} />
       <Tab.Screen name="설정" component={SettingsScreen} />
     </Tab.Navigator>
   );
