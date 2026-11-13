@@ -133,15 +133,6 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.helperText}>알림 기능은 준비 중입니다. 선택한 값만 저장됩니다.</Text>
         </View>
 
-        {/* 화면 */}
-        <Text style={styles.sectionLabel}>화면</Text>
-        <View style={styles.card}>
-          <View style={styles.row} accessibilityState={{ disabled: true }}>
-            <Text style={[styles.rowLabel, styles.disabledText]}>화면 모드</Text>
-            <Text style={[styles.rowValue, styles.disabledText]}>라이트 (다크 모드는 준비 중)</Text>
-          </View>
-        </View>
-
         {/* 정보 */}
         <Text style={styles.sectionLabel}>정보</Text>
         <View style={styles.card}>
@@ -202,7 +193,6 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: COLORS.border },
   rowLabel: { fontSize: 15, color: COLORS.textPrimary },
   rowValue: { fontSize: 14, color: COLORS.textSecondary, flexShrink: 1, textAlign: 'right' },
-  disabledText: { color: '#B3ADA3' },
   chevron: { fontSize: 22, color: '#B3ADA3' },
   logoutText: { fontSize: 15, color: '#FF3B30', fontWeight: '600' },
   helperText: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 18, paddingBottom: 12 },
