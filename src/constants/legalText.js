@@ -8,6 +8,12 @@ export const DRAFT_NOTICE =
 const AI_FREE_TIER_NOTICE =
   '무료 서비스 이용 시 입력이 Google에 의해 서비스 개선에 사용될 수 있습니다.';
 
+// AI 기능별로 Google AI로 전송되는 내용 (약관과 방침에 같은 문구를 쓴다)
+const AI_COMMENT_SUMMARY_SEND_NOTICE =
+  'AI 댓글 요약을 사용하면 해당 책의 공개 댓글이 Google AI로 전송됩니다.';
+const AI_READING_REPORT_SEND_NOTICE =
+  'AI 독서 리포트를 사용하면 선택한 기간의 완독 도서 목록이 Google AI로 전송되며, "AI 데이터 사용 동의"를 켠 경우에만 메모가 함께 전송됩니다.';
+
 export const LEGAL_DOCUMENTS = {
   terms: {
     title: '이용약관',
@@ -30,7 +36,7 @@ export const LEGAL_DOCUMENTS = {
       },
       {
         heading: '제5조 (AI 기능)',
-        body: `AI 기능은 Google의 Gemini API를 이용합니다. 설정에서 "AI 데이터 사용 동의"를 켠 경우에만 메모 내용이 AI 서비스로 전송됩니다. ${AI_FREE_TIER_NOTICE} AI가 만든 결과는 부정확할 수 있으므로 참고용으로만 사용해 주세요.`,
+        body: `AI 기능은 Google의 Gemini API를 이용합니다. 설정에서 "AI 데이터 사용 동의"를 켠 경우에만 메모 내용이 AI 서비스로 전송됩니다. ${AI_COMMENT_SUMMARY_SEND_NOTICE} ${AI_READING_REPORT_SEND_NOTICE} ${AI_FREE_TIER_NOTICE} AI가 만든 결과는 부정확할 수 있으므로 참고용으로만 사용해 주세요.`,
       },
       {
         heading: '제6조 (도서 정보)',
@@ -68,7 +74,7 @@ export const LEGAL_DOCUMENTS = {
       },
       {
         heading: '4. 외부 서비스 이용',
-        body: `· Google Gemini API: 설정에서 "AI 데이터 사용 동의"를 켠 경우에만 메모 내용이 Google의 Gemini API로 전송됩니다. ${AI_FREE_TIER_NOTICE}\n· 카카오 도서 검색 API: 도서 검색 시 입력한 검색어가 서버를 거쳐 카카오로 전달됩니다.`,
+        body: `· Google Gemini API: 설정에서 "AI 데이터 사용 동의"를 켠 경우에만 메모 내용이 Google의 Gemini API로 전송됩니다. ${AI_FREE_TIER_NOTICE}\n· Google AI(댓글 요약): ${AI_COMMENT_SUMMARY_SEND_NOTICE}\n· Google AI(독서 리포트): ${AI_READING_REPORT_SEND_NOTICE}\n· 카카오 도서 검색 API: 도서 검색 시 입력한 검색어가 서버를 거쳐 카카오로 전달됩니다.`,
       },
       {
         heading: '5. 기기에 저장되는 정보',
