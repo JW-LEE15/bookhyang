@@ -380,6 +380,45 @@ export const getAiCommentSummary = async (isbn, { includeSpoilers = false, refre
   }
 };
 
+// AI 독서 리포트 생성 API (로그인 필요). 생성하면 서버가 자동 저장한다. 이 요청만 timeout을 30초로 덮어쓴다.
+// period: 'this_month' | 'last_month'. includeNotes: 메모도 분석에 넣을지 (true일 때만 보낸다)
+// 성공 응답: { success, data: Report }. 실패하면 예외를 던진다. 서버 오류 code는 error.response.data.code에 있다. (401은 code가 없다)
+export const createReadingReport = async (period, includeNotes = false) => {
+  try {
+    const response = await api.post(
+      '/ai/reading-report',
+      { period, includeNotes: includeNotes === true },
+      { timeout: 30000 }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('AI 독서 리포트 생성 API 에러:', error.response?.data?.code || error.message);
+    throw error;
+  }
+};
+
+// 저장된 독서 리포트 목록 API (로그인 필요). 최신순 20개, 본문 포함. 응답: { success, data: Report[] }
+export const getReadingReports = async () => {
+  try {
+    const response = await api.get('/reading-reports');
+    return response.data;
+  } catch (error) {
+    console.error('독서 리포트 목록 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 저장된 독서 리포트 삭제 API (본인 것만. 없거나 남의 것이면 404)
+export const deleteReadingReport = async (id) => {
+  try {
+    const response = await api.delete(`/reading-reports/${encodeURIComponent(id)}`);
+    return response.data;
+  } catch (error) {
+    console.error('독서 리포트 삭제 API 에러:', error.response?.status || error.message);
+    throw error;
+  }
+};
+
 // 💡 [신규 추가] 6. 회원가입 API (POST /api/auth/signup)
 export const signupUser = async (email, password, nickname) => {
   try {
