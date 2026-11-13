@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useContext } from 'react';
+import React, { useState, useCallback, useContext, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -26,7 +26,6 @@ export default function MyLibraryScreen({ navigation }) {
   const { user } = useContext(AuthContext);
   const currentUserId = user?.id; // 로그인한 사용자의 DB ID
   const [books, setBooks] = useState([]);
-  const [filteredBooks, setFilteredBooks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState('ALL'); // ALL, READING, COMPLETED, WISH
   const [dateTarget, setDateTarget] = useState(null); // 완독일을 입력 중인 서재 행
@@ -35,7 +34,6 @@ export default function MyLibraryScreen({ navigation }) {
   const fetchMyBooks = async () => {
     if (!currentUserId) {
       setBooks([]);
-      setFilteredBooks([]);
       return;
     }
 
@@ -53,7 +51,6 @@ export default function MyLibraryScreen({ navigation }) {
       }
 
       setBooks(bookList);
-      applyFilter(bookList, selectedFilter);
     } catch (error) {
       console.error('서재 데이터 로드 실패:', error);
     } finally {
@@ -61,25 +58,20 @@ export default function MyLibraryScreen({ navigation }) {
     }
   };
 
-  // 필터링 적용 함수
-  const applyFilter = (bookList, filter) => {
-    if (filter === 'ALL') {
-      setFilteredBooks(bookList);
-    } else {
-      const filtered = bookList.filter((b) => {
-        const status = (b.status || '').toUpperCase();
-        if (filter === 'READING') return status === 'READING' || status === '읽는 중';
-        if (filter === 'COMPLETED') return status === 'COMPLETED' || status === '완독' || status === 'FINISHED';
-        if (filter === 'WISH') return status === 'WISH' || status === '읽고 싶은' || status === 'WANT_TO_READ';
-        return true;
-      });
-      setFilteredBooks(filtered);
-    }
-  };
+  // 원본 목록(books) + 선택된 탭(selectedFilter)에서 매 렌더마다 계산한다
+  const filteredBooks = useMemo(() => {
+    if (selectedFilter === 'ALL') return books;
+    return books.filter((b) => {
+      const status = (b.status || '').toUpperCase();
+      if (selectedFilter === 'READING') return status === 'READING' || status === '읽는 중';
+      if (selectedFilter === 'COMPLETED') return status === 'COMPLETED' || status === '완독' || status === 'FINISHED';
+      if (selectedFilter === 'WISH') return status === 'WISH' || status === '읽고 싶은' || status === 'WANT_TO_READ';
+      return true;
+    });
+  }, [books, selectedFilter]);
 
   const handleFilterChange = (filterKey) => {
     setSelectedFilter(filterKey);
-    applyFilter(books, filterKey);
   };
 
   useFocusEffect(
@@ -95,7 +87,6 @@ export default function MyLibraryScreen({ navigation }) {
     const saved = normalizeReadEndDate(res?.data?.read_end_date) || date;
     const next = books.map((b) => (b.id === target.id ? { ...b, read_end_date: saved } : b));
     setBooks(next);
-    applyFilter(next, selectedFilter);
     setDateTarget(null);
   };
 
