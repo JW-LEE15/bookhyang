@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
@@ -32,8 +33,17 @@ const isIOS = Platform.OS === 'ios';
 // iOS는 KeyboardAvoidingView, Android는 일반 View (Android는 useKeyboardPadding으로 여백을 직접 준다)
 const KeyboardWrapper = isIOS ? KeyboardAvoidingView : View;
 
-// TODO: 「민음사에서 보기」 링크 주소가 정해지면 여기에 넣고 Linking.openURL로 연결한다.
-const MINUMSA_URL = null;
+// 「민음사에서 보기」 버튼이 여는 주소 (책별 주소 규칙을 몰라 홈페이지로 연결)
+const MINUMSA_URL = 'https://minumsa.com/';
+
+// canOpenURL은 Android 11 이상에서 https에도 false를 줄 수 있어 쓰지 않고, openURL 실패만 잡는다.
+const openMinumsa = async () => {
+  try {
+    await Linking.openURL(MINUMSA_URL);
+  } catch (e) {
+    Alert.alert('알림', '링크를 열 수 없어요');
+  }
+};
 
 export default function BookDetailScreen({ route, navigation }) {
   const { user } = useContext(AuthContext); // 👈 로그인 유저 정보 추출
@@ -304,13 +314,10 @@ export default function BookDetailScreen({ route, navigation }) {
             분야 {categoryText} · 출간 {yearText}
           </Text>
 
-          {/* TODO: 주소가 정해지면 MINUMSA_URL을 채우고 Linking.openURL로 연결 */}
           <TouchableOpacity
             style={styles.externalButton}
             activeOpacity={0.8}
-            onPress={() => {
-              if (!MINUMSA_URL) Alert.alert('알림', '민음사 링크는 준비 중입니다.');
-            }}
+            onPress={openMinumsa}
           >
             <Text style={styles.externalButtonText}>민음사에서 보기</Text>
           </TouchableOpacity>
