@@ -10,6 +10,7 @@ import MyLibraryScreen from '../screens/MyLibraryScreen';
 import AiTasteScreen from '../screens/AiTasteScreen';
 import AiRecommendResultScreen from '../screens/AiRecommendResultScreen';
 import BookCommentsScreen from '../screens/BookCommentsScreen';
+import AiCommentSummaryScreen from '../screens/AiCommentSummaryScreen';
 import LegalDocumentScreen from '../screens/LegalDocumentScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 
@@ -57,6 +58,11 @@ export default function MainStackNavigator() {
             name="BookComments"
             component={BookCommentsScreen}
             options={{ headerShown: true, title: '댓글' }}
+          />
+          <Stack.Screen
+            name="AiCommentSummary"
+            component={AiCommentSummaryScreen}
+            options={{ headerShown: true, title: 'AI 댓글 요약' }}
           />
           <Stack.Screen
             name="Terms"

@@ -429,6 +429,7 @@ export default function BookDetailScreen({ route, navigation }) {
         <View onLayout={trackSection('comments')}>
           <BookCommentPreview
             isbn13={isbn13}
+            title={title}
             onPressViewAll={() => navigation.navigate('BookComments', { isbn13, title })}
           />
         </View>
