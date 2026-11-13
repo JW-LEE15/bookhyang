@@ -184,13 +184,44 @@ export const getComments = async (isbn, { limit, before } = {}) => {
   }
 };
 
-// 댓글 작성 API (로그인 필요, 작성자는 서버가 토큰으로 확인)
-export const createComment = async (isbn, content) => {
+// 원댓글에 달린 답글 목록 조회 API (오래된 순). after는 이 답글 id 다음부터 (문자열)
+export const getReplies = async (commentId, { limit, after } = {}) => {
   try {
-    const response = await api.post('/comments', { isbn, content });
+    const params = {};
+    if (limit) params.limit = limit;
+    if (after) params.after = after;
+    const response = await api.get(`/comments/${encodeURIComponent(commentId)}/replies`, { params });
+    return response.data;
+  } catch (error) {
+    console.error('답글 조회 API 에러:', error.message);
+    throw error;
+  }
+};
+
+// 댓글 작성 API (로그인 필요, 작성자는 서버가 토큰으로 확인)
+// parent_id가 있으면 그 원댓글의 답글, is_spoiler가 true면 스포일러 댓글
+export const createComment = async (isbn, content, { parent_id, is_spoiler } = {}) => {
+  try {
+    const body = { isbn, content };
+    if (parent_id) body.parent_id = parent_id;
+    if (is_spoiler) body.is_spoiler = true;
+    const response = await api.post('/comments', body);
     return response.data;
   } catch (error) {
     console.error('댓글 작성 API 에러:', error.message);
+    throw error;
+  }
+};
+
+// 내 댓글 숨김/숨김 해제 API (같은 값을 다시 보내도 결과는 같다. 남의 댓글이면 404)
+export const setCommentHidden = async (commentId, isHidden) => {
+  try {
+    const response = await api.patch(`/comments/${encodeURIComponent(commentId)}/hidden`, {
+      is_hidden: Boolean(isHidden),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('댓글 숨김 API 에러:', error.message);
     throw error;
   }
 };

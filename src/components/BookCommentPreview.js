@@ -83,7 +83,9 @@ export default function BookCommentPreview({ isbn13, onPressViewAll }) {
       {status === 'ready'
         ? comments.map((comment, index) => (
             <View key={comment.id} style={index > 0 ? styles.divider : null}>
-              <CommentItem comment={comment} numberOfLines={3} />
+              {/* 읽기 전용: 액션 없음. 스포일러는 가림만 보이고 펼치기는 전체보기에서 한다.
+                  is_mine은 서버 값만 쓴다 (내 숨김 댓글에 「숨김 상태」 배지를 붙이기 위함) */}
+              <CommentItem comment={comment} isMine={comment.is_mine === true} numberOfLines={3} />
             </View>
           ))
         : null}
