@@ -241,11 +241,16 @@ export default function MyScreen({ navigation }) {
           </ScrollView>
         )}
 
-        {/* AI 독서 리포트: 자리만 만들어 두고 비활성 */}
-        <View style={[styles.aiReportButton, styles.sectionGap]}>
+        {/* AI 독서 리포트 */}
+        <TouchableOpacity
+          style={[styles.aiReportButton, styles.sectionGap]}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('AiReport')}
+          accessibilityRole="button"
+        >
           <Text style={styles.aiReportText}>AI 독서 리포트</Text>
-          <Text style={styles.aiReportBadge}>준비 중</Text>
-        </View>
+          <Text style={styles.aiReportBadge}>&gt;</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -342,9 +347,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: COLORS.border,
-    opacity: 0.7,
+    backgroundColor: COLORS.primary,
   },
-  aiReportText: { fontSize: 14, fontWeight: 'bold', color: COLORS.textSecondary },
-  aiReportBadge: { fontSize: 12, fontWeight: 'bold', color: COLORS.textSecondary },
+  aiReportText: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
+  aiReportBadge: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
 });
