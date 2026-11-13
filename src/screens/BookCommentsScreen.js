@@ -14,15 +14,26 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/theme';
 import { AuthContext } from '../context/AuthContext';
-import { getComments, createComment, deleteComment } from '../api';
+import {
+  getComments,
+  getReplies,
+  createComment,
+  deleteComment,
+  setCommentHidden,
+} from '../api';
 import useKeyboardPadding from '../hooks/useKeyboardPadding';
 import CommentItem from '../components/CommentItem';
 import { NO_ISBN_MESSAGE } from '../components/BookCommentPreview';
+import { COMMENT_ERROR_MESSAGES, getCommentErrorCode, getCommentErrorMessage } from '../utils/commentErrors';
 
 const PAGE_SIZE = 20;
+const REPLY_PAGE_SIZE = 20;
 const CONTENT_MAX_LENGTH = 500;
 // 스택 헤더 기본 높이(iOS). KeyboardAvoidingView가 헤더만큼 아래에 있어서 그만큼 보정한다.
 const IOS_HEADER_HEIGHT = 44;
+
+// 원댓글별 답글 목록 상태의 처음 값
+const EMPTY_REPLIES = { open: false, items: [], nextCursor: null, loaded: false, loading: false, error: false };
 
 // 글자 수 (이모지도 1글자. 서버, DB와 같은 기준)
 const charLength = (str) => [...str].length;
@@ -30,15 +41,13 @@ const charLength = (str) => [...str].length;
 // iOS는 KeyboardAvoidingView, Android는 일반 View (Android는 useKeyboardPadding으로 여백을 직접 준다)
 const KeyboardWrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
 
-// 서버가 준 오류 메시지가 있으면 그것을, 없으면 기본 메시지를
-const getErrorMessage = (error, fallback) => error?.response?.data?.message || fallback;
-
 // 책별 댓글 화면. 책은 ISBN13(route.params.isbn13)로만 식별한다. 책 id는 쓰지 않는다.
 export default function BookCommentsScreen({ route }) {
   const { isbn13, title } = route.params || {};
   const { user } = useContext(AuthContext);
   const insets = useSafeAreaInsets();
   const listRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Android: 키보드 높이와 컨테이너 높이 변화를 재서 하단 여백을 직접 준다 (iOS는 padding 0, KeyboardAvoidingView 사용)
   const keyboardPadding = useKeyboardPadding();
@@ -54,8 +63,21 @@ export default function BookCommentsScreen({ route }) {
   const loadingMoreRef = useRef(false); // onEndReached가 연달아 불리는 것을 막는다
 
   const [text, setText] = useState('');
+  const [isSpoilerChecked, setIsSpoilerChecked] = useState(false);
+  const [replyTarget, setReplyTarget] = useState(null); // 답글을 달 원댓글 (null이면 일반 댓글)
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [hidingId, setHidingId] = useState(null);
+
+  const [repliesByParent, setRepliesByParent] = useState({}); // { [원댓글 id]: 답글 목록 상태 }
+  const repliesLoadingRef = useRef({});
+  const [revealedSpoilers, setRevealedSpoilers] = useState({}); // { [댓글 id]: true } 화면을 나가면 다시 가려진다
+
+  // 서버 is_mine을 우선, 없을 때만 응답의 user_id와 로그인한 내 user.id를 비교
+  const isMineComment = (item) => {
+    if (typeof item.is_mine === 'boolean') return item.is_mine;
+    return Boolean(user?.id) && item.user_id != null && String(item.user_id) === String(user.id);
+  };
 
   const loadFirstPage = useCallback(async () => {
     try {
@@ -109,18 +131,111 @@ export default function BookCommentsScreen({ route }) {
     }
   };
 
+  // ---- 답글 목록 ----
+
+  const patchReplies = (parentId, patch) => {
+    setRepliesByParent((prev) => ({
+      ...prev,
+      [parentId]: { ...(prev[parentId] || EMPTY_REPLIES), ...patch },
+    }));
+  };
+
+  // 답글을 불러온다. replace면 처음부터 다시, after가 있으면 그 뒤부터 이어 붙인다.
+  const fetchReplies = async (parentId, { after, replace = false } = {}) => {
+    if (repliesLoadingRef.current[parentId]) return;
+    repliesLoadingRef.current[parentId] = true;
+    patchReplies(parentId, { loading: true, error: false });
+    try {
+      const res = await getReplies(parentId, { limit: REPLY_PAGE_SIZE, after });
+      const incoming = Array.isArray(res?.data) ? res.data : [];
+      setRepliesByParent((prev) => {
+        const cur = prev[parentId] || EMPTY_REPLIES;
+        const base = replace ? [] : cur.items;
+        const known = new Set(base.map((c) => c.id));
+        return {
+          ...prev,
+          [parentId]: {
+            ...cur,
+            items: [...base, ...incoming.filter((c) => !known.has(c.id))],
+            nextCursor: res?.nextCursor ?? null,
+            loaded: true,
+            loading: false,
+            error: false,
+          },
+        };
+      });
+      // 서버가 알려 준 답글 수로 원댓글의 reply_count를 맞춘다
+      if (res?.total != null && Number.isFinite(Number(res.total))) {
+        const count = Number(res.total);
+        setComments((prev) => prev.map((c) => (c.id === parentId ? { ...c, reply_count: count } : c)));
+      }
+    } catch (error) {
+      patchReplies(parentId, { loading: false, error: true });
+      if (error?.response?.status === 404) {
+        // 원댓글이 없어졌다: 목록을 새로 맞춘다
+        Alert.alert('알림', COMMENT_ERROR_MESSAGES.PARENT_NOT_FOUND);
+        loadFirstPage();
+      }
+    } finally {
+      repliesLoadingRef.current[parentId] = false;
+    }
+  };
+
+  const toggleReplies = (parent) => {
+    const cur = repliesByParent[parent.id] || EMPTY_REPLIES;
+    if (cur.open) {
+      patchReplies(parent.id, { open: false });
+      return;
+    }
+    patchReplies(parent.id, { open: true });
+    if (!cur.loaded) fetchReplies(parent.id);
+  };
+
+  // ---- 작성 ----
+
   const trimmed = text.trim();
   const length = charLength(text);
   const tooLong = length > CONTENT_MAX_LENGTH;
   const canSubmit = trimmed.length > 0 && !tooLong && !submitting;
 
+  const startReply = (parent) => {
+    setReplyTarget(parent);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
+    const parent = replyTarget;
     try {
-      const res = await createComment(isbn13, trimmed);
+      const res = await createComment(isbn13, trimmed, {
+        parent_id: parent?.id,
+        is_spoiler: isSpoilerChecked,
+      });
       const created = res?.data;
-      if (created) {
+      if (parent) {
+        // 답글: 그 원댓글의 답글 목록을 펼치고 reply_count를 갱신한다
+        const cur = repliesByParent[parent.id] || EMPTY_REPLIES;
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === parent.id ? { ...c, reply_count: (Number(c.reply_count) || 0) + 1 } : c
+          )
+        );
+        setTotal((prev) => prev + 1);
+        patchReplies(parent.id, { open: true });
+        if (!cur.loaded) {
+          // 아직 안 불러왔으면 서버 목록을 받아 온다 (방금 쓴 답글 포함)
+          await fetchReplies(parent.id, { replace: true });
+        } else if (created && !cur.nextCursor) {
+          // 끝까지 불러온 상태면 맨 뒤에 붙인다 (오래된 순이라 새 답글이 마지막)
+          patchReplies(parent.id, {
+            items: [...cur.items.filter((c) => c.id !== created.id), created],
+          });
+        } else if (!created) {
+          await fetchReplies(parent.id, { replace: true });
+        }
+        // 일부만 불러온 상태면 「더 보기」로 이어 받을 때 포함된다
+      } else if (created) {
         setComments((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
         setTotal((prev) => prev + 1);
         listRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -128,16 +243,71 @@ export default function BookCommentsScreen({ route }) {
         await loadFirstPage();
       }
       setText('');
+      setIsSpoilerChecked(false);
+      setReplyTarget(null);
     } catch (error) {
-      Alert.alert('오류', getErrorMessage(error, '댓글을 등록하지 못했습니다.'));
+      const code = getCommentErrorCode(error);
+      if (code === 'PARENT_NOT_FOUND' || code === 'PARENT_HIDDEN') {
+        // 더 이상 답글을 달 수 없는 원댓글: 답글 모드를 풀고 목록을 새로 맞춘다 (쓰던 내용은 남겨 둔다)
+        setReplyTarget(null);
+        loadFirstPage();
+      }
+      Alert.alert('오류', getCommentErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const removeFromList = (commentId) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId));
-    setTotal((prev) => Math.max(prev - 1, 0));
+  // ---- 숨김 ----
+
+  // PATCH 응답의 댓글로 목록 안의 같은 댓글을 바꾼다 (원댓글, 답글 모두)
+  const replaceComment = (updated) => {
+    setComments((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+    if (updated.parent_id) {
+      setRepliesByParent((prev) => {
+        const cur = prev[updated.parent_id];
+        if (!cur) return prev;
+        return {
+          ...prev,
+          [updated.parent_id]: {
+            ...cur,
+            items: cur.items.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)),
+          },
+        };
+      });
+    }
+  };
+
+  const handleToggleHidden = async (comment) => {
+    if (hidingId) return;
+    setHidingId(comment.id);
+    try {
+      const res = await setCommentHidden(comment.id, !comment.is_hidden);
+      if (res?.data) replaceComment(res.data);
+      else await loadFirstPage();
+    } catch (error) {
+      if (error?.response?.status === 404) {
+        // 이미 지워졌거나 내 댓글이 아닌 경우: 목록을 새로 맞춘다
+        Alert.alert('알림', '이미 삭제되었거나 찾을 수 없는 댓글입니다.');
+        loadFirstPage();
+      } else {
+        Alert.alert('오류', getCommentErrorMessage(error));
+      }
+    } finally {
+      setHidingId(null);
+    }
+  };
+
+  // ---- 삭제 ----
+
+  // 삭제 뒤에는 서버 값으로 목록과 total을 다시 받는다 (삭제 표시로 남는지 완전히 지워지는지는 서버가 정한다)
+  const refreshAfterDelete = (comment) => {
+    loadFirstPage();
+    if (comment.parent_id) {
+      const cur = repliesByParent[comment.parent_id];
+      if (cur?.loaded) fetchReplies(comment.parent_id, { replace: true });
+    }
+    if (replyTarget && String(replyTarget.id) === String(comment.id)) setReplyTarget(null);
   };
 
   const handleDelete = (comment) => {
@@ -150,14 +320,14 @@ export default function BookCommentsScreen({ route }) {
           setDeletingId(comment.id);
           try {
             await deleteComment(comment.id);
-            removeFromList(comment.id);
+            refreshAfterDelete(comment);
           } catch (error) {
             if (error?.response?.status === 404) {
-              // 이미 지워졌거나 찾을 수 없는 댓글: 목록에서만 정리한다
-              removeFromList(comment.id);
+              // 이미 지워졌거나 찾을 수 없는 댓글: 목록을 새로 맞춘다
+              refreshAfterDelete(comment);
               Alert.alert('알림', '이미 삭제되었거나 찾을 수 없는 댓글입니다.');
             } else {
-              Alert.alert('오류', getErrorMessage(error, '댓글을 삭제하지 못했습니다.'));
+              Alert.alert('오류', getCommentErrorMessage(error));
             }
           } finally {
             setDeletingId(null);
@@ -178,17 +348,64 @@ export default function BookCommentsScreen({ route }) {
     );
   }
 
-  const renderItem = ({ item }) => {
-    // 내 댓글에만 삭제 버튼 (응답의 user_id와 로그인한 내 user.id 비교)
-    const isMine = Boolean(user?.id) && String(item.user_id) === String(user.id);
+  const renderComment = (item, { isReply = false } = {}) => {
+    const mine = isMineComment(item);
+    const state = repliesByParent[item.id] || EMPTY_REPLIES;
     return (
       <CommentItem
         comment={item}
-        onDelete={isMine ? () => handleDelete(item) : undefined}
+        isReply={isReply}
+        isMine={mine}
+        onDelete={mine && !item.is_deleted ? () => handleDelete(item) : undefined}
         deleting={deletingId === item.id}
+        onToggleHidden={mine && !item.is_deleted ? () => handleToggleHidden(item) : undefined}
+        hiding={hidingId === item.id}
+        onReply={isReply ? undefined : () => startReply(item)}
+        repliesOpen={state.open}
+        onToggleReplies={isReply ? undefined : () => toggleReplies(item)}
+        spoilerRevealed={Boolean(revealedSpoilers[item.id])}
+        onRevealSpoiler={() => setRevealedSpoilers((prev) => ({ ...prev, [item.id]: true }))}
       />
     );
   };
+
+  const renderReplies = (parent) => {
+    const state = repliesByParent[parent.id];
+    if (!state?.open) return null;
+    return (
+      <View style={styles.replies}>
+        {state.items.map((reply) => (
+          <View key={reply.id}>{renderComment(reply, { isReply: true })}</View>
+        ))}
+        {state.loading ? (
+          <ActivityIndicator size="small" color={COLORS.primary} style={styles.replyLoading} />
+        ) : null}
+        {state.error && !state.loading ? (
+          <TouchableOpacity
+            onPress={() => fetchReplies(parent.id, state.loaded ? { after: state.nextCursor } : {})}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.replyMoreText}>답글을 불러오지 못했습니다. 눌러서 다시 시도</Text>
+          </TouchableOpacity>
+        ) : null}
+        {state.nextCursor && !state.loading && !state.error ? (
+          <TouchableOpacity
+            onPress={() => fetchReplies(parent.id, { after: state.nextCursor })}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.replyMoreText}>더 보기</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    );
+  };
+
+  const renderItem = ({ item }) => (
+    <View>
+      {renderComment(item)}
+      {renderReplies(item)}
+    </View>
+  );
 
   const renderEmpty = () => {
     if (status === 'loading') {
@@ -214,7 +431,8 @@ export default function BookCommentsScreen({ route }) {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       {/* 키보드 처리 (공유 KeyboardAwareContainer는 수정하지 않음)
           - iOS: KeyboardAvoidingView padding + 헤더 오프셋
-          - Android: KeyboardAvoidingView 대신 View. 키보드 높이와 컨테이너 높이 변화를 재서 paddingBottom을 직접 준다 */}
+          - Android: KeyboardAvoidingView 대신 View. 키보드 높이와 컨테이너 높이 변화를 재서 paddingBottom을 직접 준다
+          답글 모드 줄은 inputBar 안에 있어서 입력창이 위로 커질 뿐 키보드에 가려지지 않는다. */}
       <KeyboardWrapper
         style={[styles.flex, !isIOS && { paddingBottom: keyboardPadding.padding }]}
         {...(isIOS
@@ -248,33 +466,61 @@ export default function BookCommentsScreen({ route }) {
         />
 
         <View style={styles.inputBar}>
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.input}
-              value={text}
-              onChangeText={setText}
-              placeholder="댓글을 입력하세요"
-              placeholderTextColor="#9A9187"
-              multiline
-              editable={!submitting}
-              textAlignVertical="top"
-            />
-            <Text style={[styles.counter, tooLong && styles.counterOver]}>
-              {length}/{CONTENT_MAX_LENGTH}
-            </Text>
+          {replyTarget ? (
+            <View style={styles.replyBanner}>
+              <Text style={styles.replyBannerText} numberOfLines={1}>
+                @{replyTarget.nickname || '알 수 없음'}에게 답글
+              </Text>
+              <TouchableOpacity onPress={() => setReplyTarget(null)} hitSlop={8} disabled={submitting}>
+                <Text style={styles.replyCancelText}>취소</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <View style={styles.inputRow}>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                ref={inputRef}
+                style={styles.input}
+                value={text}
+                onChangeText={setText}
+                placeholder={replyTarget ? '답글을 입력하세요' : '댓글을 입력하세요'}
+                placeholderTextColor="#9A9187"
+                multiline
+                editable={!submitting}
+                textAlignVertical="top"
+              />
+              <View style={styles.optionRow}>
+                <TouchableOpacity
+                  style={styles.spoilerCheck}
+                  onPress={() => setIsSpoilerChecked((prev) => !prev)}
+                  disabled={submitting}
+                  activeOpacity={0.7}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isSpoilerChecked }}
+                >
+                  <View style={[styles.checkBox, isSpoilerChecked && styles.checkBoxOn]}>
+                    {isSpoilerChecked ? <Text style={styles.checkMark}>✓</Text> : null}
+                  </View>
+                  <Text style={styles.spoilerCheckText}>스포일러 포함</Text>
+                </TouchableOpacity>
+                <Text style={[styles.counter, tooLong && styles.counterOver]}>
+                  {length}/{CONTENT_MAX_LENGTH}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.sendButton, !canSubmit && styles.sendButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={!canSubmit}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.sendText}>{replyTarget ? '답글' : '등록'}</Text>
+              )}
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.sendButton, !canSubmit && styles.sendButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            activeOpacity={0.8}
-          >
-            {submitting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.sendText}>등록</Text>
-            )}
-          </TouchableOpacity>
         </View>
       </KeyboardWrapper>
     </SafeAreaView>
@@ -292,10 +538,16 @@ const styles = StyleSheet.create({
   separator: { height: 1, backgroundColor: COLORS.border },
   infoText: { fontSize: 14, color: COLORS.textSecondary, paddingVertical: 24, textAlign: 'center' },
   loading: { marginVertical: 24 },
+  replies: { marginLeft: 4, paddingBottom: 8 },
+  replyLoading: { marginVertical: 12 },
+  replyMoreText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.secondary,
+    paddingVertical: 8,
+    paddingLeft: 20,
+  },
   inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 10,
@@ -303,6 +555,22 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
+  replyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  replyBannerText: { flex: 1, fontSize: 12, fontWeight: '600', color: COLORS.primary },
+  replyCancelText: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   inputWrapper: { flex: 1 },
   input: {
     minHeight: 44,
@@ -317,7 +585,27 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 10,
   },
-  counter: { fontSize: 11, color: COLORS.textSecondary, textAlign: 'right', marginTop: 2 },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  spoilerCheck: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+  checkBox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: COLORS.secondary,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkBoxOn: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  checkMark: { fontSize: 11, lineHeight: 13, color: '#FFFFFF', fontWeight: 'bold' },
+  spoilerCheckText: { fontSize: 12, color: COLORS.textSecondary },
+  counter: { fontSize: 11, color: COLORS.textSecondary, textAlign: 'right' },
   counterOver: { color: '#FF3B30', fontWeight: 'bold' },
   sendButton: {
     height: 44,
@@ -327,7 +615,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 17,
+    marginBottom: 22,
   },
   sendButtonDisabled: { backgroundColor: '#C9BFB3' },
   sendText: { fontSize: 14, fontWeight: 'bold', color: '#FFFFFF' },
