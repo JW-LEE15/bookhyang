@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import { formatTimeAgo } from '../utils/timeAgo';
 import UserAvatar from './UserAvatar';
@@ -13,6 +14,8 @@ const SPOILER_TEXT = '스포일러가 포함된 댓글입니다 · 눌러서 보
 // - onReply: 원댓글에서만 넘긴다 (삭제·숨김 상태에서는 이 컴포넌트가 버튼을 숨긴다)
 // - onToggleReplies: 원댓글의 「답글 n개 보기 / 답글 접기」 (reply_count가 0이면 숨김)
 // - onRevealSpoiler: 스포일러를 눌러서 펼친다 (안 넘기면 가림만 보이고 펼칠 수 없다)
+// - onToggleLike / liking: 하트 버튼. 안 넘기거나 내 댓글이면 개수만 보인다 (0개면 숨김). 삭제 표시·가려진 댓글에는 하트가 없다
+// - onReport: 「신고」 버튼. 남의 댓글에서만 넘기고, 삭제 표시 댓글에서는 이 컴포넌트가 숨긴다
 export default function CommentItem({
   comment,
   isMine = false,
@@ -27,6 +30,9 @@ export default function CommentItem({
   onRevealSpoiler,
   numberOfLines,
   isReply = false,
+  onToggleLike,
+  liking = false,
+  onReport,
 }) {
   const isDeleted = Boolean(comment.is_deleted);
   const isMasked = !isDeleted && Boolean(comment.content_masked);
@@ -37,6 +43,13 @@ export default function CommentItem({
   const replyCount = Number(comment.reply_count) || 0;
   const showReplyToggle = !isReply && Boolean(onToggleReplies) && replyCount > 0;
   const canReply = !isReply && Boolean(onReply) && !isDeleted && !isMasked && !comment.is_hidden;
+
+  const likeCount = Math.max(0, Number(comment.like_count) || 0);
+  const liked = Boolean(comment.liked_by_me);
+  const showLikeArea = !isDeleted && !isMasked;
+  const canLike = showLikeArea && Boolean(onToggleLike) && !isMine;
+  const showLike = canLike || (showLikeArea && likeCount > 0);
+  const canReport = !isDeleted && !isMasked && !isMine && Boolean(onReport);
 
   const renderBody = () => {
     if (isDeleted) {
@@ -84,6 +97,11 @@ export default function CommentItem({
             </View>
           ) : null}
           <Text style={styles.time}>{formatTimeAgo(comment.created_at)}</Text>
+          {canReport ? (
+            <TouchableOpacity onPress={onReport} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.actionText}>신고</Text>
+            </TouchableOpacity>
+          ) : null}
           {onToggleHidden ? (
             <TouchableOpacity onPress={onToggleHidden} disabled={hiding || deleting} hitSlop={8}>
               <Text style={[styles.actionText, (hiding || deleting) && styles.actionTextDisabled]}>
@@ -103,8 +121,33 @@ export default function CommentItem({
 
       {renderBody()}
 
-      {canReply || showReplyToggle ? (
+      {canReply || showReplyToggle || showLike ? (
         <View style={styles.footer}>
+          {showLike ? (
+            canLike ? (
+              <TouchableOpacity
+                style={styles.likeButton}
+                onPress={onToggleLike}
+                disabled={liking}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={liked ? '공감 취소' : '공감'}
+                accessibilityState={{ selected: liked, disabled: liking }}
+              >
+                <Ionicons
+                  name={liked ? 'heart' : 'heart-outline'}
+                  size={16}
+                  color={liked ? COLORS.accent : COLORS.secondary}
+                />
+                <Text style={[styles.likeCount, liked && styles.likeCountOn]}>{likeCount}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.likeButton} accessibilityLabel={`공감 ${likeCount}개`}>
+                <Ionicons name="heart" size={16} color={COLORS.border} />
+                <Text style={styles.likeCount}>{likeCount}</Text>
+              </View>
+            )
+          ) : null}
           {canReply ? (
             <TouchableOpacity onPress={onReply} hitSlop={8}>
               <Text style={styles.footerText}>답글 달기</Text>
@@ -154,5 +197,8 @@ const styles = StyleSheet.create({
   },
   spoilerText: { fontSize: 13, color: COLORS.secondary },
   footer: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 },
+  likeButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  likeCount: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
+  likeCountOn: { color: COLORS.accent },
   footerText: { fontSize: 12, color: COLORS.secondary, fontWeight: '600' },
 });

@@ -237,6 +237,44 @@ export const deleteComment = async (commentId) => {
   }
 };
 
+// 댓글 공감 API (로그인 필요). 응답: { success, data: { comment_id, like_count, liked_by_me: true } }
+// 실패하면 예외를 던진다. 400 LIKE_OWN_COMMENT, 404, 429 RATE_LIMITED는 error.response로 구분한다.
+export const likeComment = async (commentId) => {
+  try {
+    const response = await api.put(`/comments/${encodeURIComponent(commentId)}/like`);
+    return response.data;
+  } catch (error) {
+    console.error('댓글 공감 API 에러:', error.response?.data?.code || error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 댓글 공감 취소 API (로그인 필요, 멱등). 응답: { success, data: { comment_id, like_count, liked_by_me: false } }
+export const unlikeComment = async (commentId) => {
+  try {
+    const response = await api.delete(`/comments/${encodeURIComponent(commentId)}/like`);
+    return response.data;
+  } catch (error) {
+    console.error('댓글 공감 취소 API 에러:', error.response?.data?.code || error.response?.status || error.message);
+    throw error;
+  }
+};
+
+// 댓글 신고 API (로그인 필요). reason: 'spam' | 'abuse' | 'spoiler' | 'other', detail: 선택(200자 이하)
+// 성공: 201 { success, message }. 실패하면 예외를 던진다. 400 REPORT_OWN_COMMENT, 404, 409 ALREADY_REPORTED, 429는 error.response로 구분한다.
+// 신고 내용(detail)은 로그에 남기지 않는다.
+export const reportComment = async (commentId, reason, detail) => {
+  try {
+    const body = { reason };
+    if (detail) body.detail = detail;
+    const response = await api.post(`/comments/${encodeURIComponent(commentId)}/report`, body);
+    return response.data;
+  } catch (error) {
+    console.error('댓글 신고 API 에러:', error.response?.data?.code || error.response?.status || error.message);
+    throw error;
+  }
+};
+
 // 모음집 도서 목록 API (공개). category 생략이면 전체(소설/시/에세이), sort는 'title'(기본) | 'latest'
 // 응답: { success, data: [books 행], pagination: { page, limit, total, hasNext } }
 export const getBooks = async ({ category, sort = 'title', page = 1, limit = 30 } = {}) => {

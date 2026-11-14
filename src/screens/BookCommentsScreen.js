@@ -20,11 +20,24 @@ import {
   createComment,
   deleteComment,
   setCommentHidden,
+  likeComment,
+  unlikeComment,
+  reportComment,
 } from '../api';
 import useKeyboardPadding from '../hooks/useKeyboardPadding';
 import CommentItem from '../components/CommentItem';
+import ReportCommentModal from '../components/ReportCommentModal';
 import { NO_ISBN_MESSAGE } from '../components/BookCommentPreview';
-import { COMMENT_ERROR_MESSAGES, getCommentErrorCode, getCommentErrorMessage } from '../utils/commentErrors';
+import {
+  COMMENT_ERROR_MESSAGES,
+  getCommentErrorCode,
+  getCommentErrorMessage,
+  getLikeErrorMessage,
+  getReportErrorMessage,
+  isAlreadyReported,
+  REPORT_SUCCESS_TEXT,
+  ALREADY_REPORTED_TEXT,
+} from '../utils/commentErrors';
 
 const PAGE_SIZE = 20;
 const REPLY_PAGE_SIZE = 20;
@@ -71,6 +84,9 @@ export default function BookCommentsScreen({ route, navigation }) {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [hidingId, setHidingId] = useState(null);
+  const [likingIds, setLikingIds] = useState({}); // { [댓글 id]: true } 공감 요청 진행 중
+  const likingRef = useRef({}); // 연타 방지 (state보다 먼저 막기 위함)
+  const [reportTarget, setReportTarget] = useState(null); // 신고할 댓글 (null이면 모달 닫힘)
 
   const [repliesByParent, setRepliesByParent] = useState({}); // { [원댓글 id]: 답글 목록 상태 }
   const repliesLoadingRef = useRef({});
@@ -344,6 +360,86 @@ export default function BookCommentsScreen({ route, navigation }) {
     }
   };
 
+  // ---- 공감 ----
+
+  // 원댓글 목록과 모든 답글 목록에서 id가 같은 댓글에 값을 덮어쓴다
+  const patchCommentById = (id, patch) => {
+    setComments((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    setRepliesByParent((prev) => {
+      let changed = false;
+      const next = {};
+      Object.keys(prev).forEach((parentId) => {
+        const cur = prev[parentId];
+        if (cur.items.some((c) => c.id === id)) {
+          changed = true;
+          next[parentId] = { ...cur, items: cur.items.map((c) => (c.id === id ? { ...c, ...patch } : c)) };
+        } else {
+          next[parentId] = cur;
+        }
+      });
+      return changed ? next : prev;
+    });
+  };
+
+  // 낙관적으로 먼저 바꾸고, 서버 값으로 확정한다. 실패하면 이전 값으로 되돌린다.
+  const handleToggleLike = async (comment) => {
+    const id = comment.id;
+    if (likingRef.current[id]) return;
+    likingRef.current[id] = true;
+    setLikingIds((prev) => ({ ...prev, [id]: true }));
+
+    const prevState = {
+      like_count: Math.max(0, Number(comment.like_count) || 0),
+      liked_by_me: Boolean(comment.liked_by_me),
+    };
+    const willLike = !prevState.liked_by_me;
+    patchCommentById(id, {
+      like_count: Math.max(0, prevState.like_count + (willLike ? 1 : -1)),
+      liked_by_me: willLike,
+    });
+
+    try {
+      const res = await (willLike ? likeComment(id) : unlikeComment(id));
+      const data = res?.data;
+      if (data && Number.isFinite(Number(data.like_count))) {
+        patchCommentById(id, {
+          like_count: Number(data.like_count),
+          liked_by_me: Boolean(data.liked_by_me),
+        });
+      }
+    } catch (error) {
+      patchCommentById(id, prevState);
+      Alert.alert('알림', getLikeErrorMessage(error));
+    } finally {
+      likingRef.current[id] = false;
+      setLikingIds((prev) => {
+        const { [id]: _removed, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
+  // ---- 신고 ----
+
+  // 모달에서 호출: 성공이면 true, 이미 신고했으면 안내 후 true(모달 닫힘), 그 밖은 모달에 보여줄 고정 안내문을 돌려준다
+  const handleSubmitReport = async (reason, detail) => {
+    const target = reportTarget;
+    if (!target) return true;
+    try {
+      await reportComment(target.id, reason, detail);
+      setReportTarget(null);
+      Alert.alert('알림', REPORT_SUCCESS_TEXT);
+      return true;
+    } catch (error) {
+      if (isAlreadyReported(error)) {
+        setReportTarget(null);
+        Alert.alert('알림', ALREADY_REPORTED_TEXT);
+        return true;
+      }
+      return getReportErrorMessage(error);
+    }
+  };
+
   // ---- 삭제 ----
 
   // 삭제 뒤에는 서버 값으로 목록과 total을 다시 받는다 (삭제 표시로 남는지 완전히 지워지는지는 서버가 정한다)
@@ -411,6 +507,9 @@ export default function BookCommentsScreen({ route, navigation }) {
         onToggleReplies={isReply ? undefined : () => toggleReplies(item)}
         spoilerRevealed={Boolean(revealedSpoilers[item.id])}
         onRevealSpoiler={() => setRevealedSpoilers((prev) => ({ ...prev, [item.id]: true }))}
+        onToggleLike={mine || item.is_deleted ? undefined : () => handleToggleLike(item)}
+        liking={Boolean(likingIds[item.id])}
+        onReport={mine || item.is_deleted ? undefined : () => setReportTarget(item)}
       />
     );
   };
@@ -580,6 +679,12 @@ export default function BookCommentsScreen({ route, navigation }) {
           </View>
         </View>
       </KeyboardWrapper>
+
+      <ReportCommentModal
+        visible={reportTarget !== null}
+        onClose={() => setReportTarget(null)}
+        onSubmit={handleSubmitReport}
+      />
     </SafeAreaView>
   );
 }
