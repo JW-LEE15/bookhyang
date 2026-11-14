@@ -13,6 +13,7 @@ import BookCommentsScreen from '../screens/BookCommentsScreen';
 import AiCommentSummaryScreen from '../screens/AiCommentSummaryScreen';
 import AiReportScreen from '../screens/AiReportScreen';
 import LegalDocumentScreen from '../screens/LegalDocumentScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import BottomTabNavigator from './BottomTabNavigator';
 
 const Stack = createStackNavigator();
@@ -69,6 +70,11 @@ export default function MainStackNavigator() {
             name="AiReport"
             component={AiReportScreen}
             options={{ headerShown: true, title: 'AI 독서 리포트' }}
+          />
+          <Stack.Screen
+            name="EditProfile"
+            component={EditProfileScreen}
+            options={{ headerShown: true, title: '닉네임 변경' }}
           />
           <Stack.Screen
             name="Terms"

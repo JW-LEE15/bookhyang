@@ -73,10 +73,16 @@ export default function SettingsScreen({ navigation }) {
         {/* 계정 */}
         <Text style={styles.sectionLabel}>계정</Text>
         <View style={styles.card}>
-          <View style={styles.row}>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('EditProfile')}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+          >
             <Text style={styles.rowLabel}>닉네임</Text>
             <Text style={styles.rowValue} numberOfLines={1}>{user?.nickname || '-'}</Text>
-          </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
           <View style={styles.divider} />
           <View style={styles.row}>
             <Text style={styles.rowLabel}>이메일</Text>
