@@ -448,4 +448,11 @@ export const loginUser = async (email, password) => {
   }
 };
 
+// 8. 닉네임 변경 API (PATCH /api/auth/nickname, 로그인 필요)
+// 성공 시 응답 { success, message, user }를 돌려준다. 실패는 호출하는 쪽이 error.response?.status로 구분한다.
+export const updateNickname = async (nickname) => {
+  const response = await api.patch('/auth/nickname', { nickname });
+  return response.data;
+};
+
 export default api;

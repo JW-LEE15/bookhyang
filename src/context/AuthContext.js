@@ -25,6 +25,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   // 만료 알림을 이미 띄웠는지 (동시에 여러 요청이 401이어도 한 번만)
   const expiredHandledRef = useRef(false);
+  // 최신 user (updateUser가 오래된 값에 덮어쓰지 않게 한다)
+  const userRef = useRef(null);
+  userRef.current = user;
 
   // 1. 앱 실행 시 저장된 로그인 정보 불러오기. 토큰이 없으면 user_info도 지우고 로그인 화면으로.
   useEffect(() => {
@@ -106,8 +109,22 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // 6. 유저 정보 일부 갱신 (예: 닉네임 변경). 화면 상태와 저장된 user_info를 함께 바꾼다.
+  const updateUser = async (partial) => {
+    const current = userRef.current;
+    if (!current || !partial) return;
+    const merged = { ...current, ...partial };
+    userRef.current = merged;
+    setUser(merged);
+    try {
+      await AsyncStorage.setItem(USER_INFO_KEY, JSON.stringify(merged));
+    } catch (e) {
+      console.error('유저 정보 저장 실패:', e?.message);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
