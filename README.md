@@ -56,19 +56,10 @@
 ### 대표 시연 화면
 
 <p align="center">
-  <img src="./assets/icon.png" alt="북향 앱 대표 시연 화면" width="100%" />
+  <img src="./assets/icon.png" alt="북향 앱 대표 시연 화면" width="50%" />
 </p>
 
 ### 주요 화면
-
-<!--
-이미지 추가 방법:
-
-<img src="./docs/images/home.png" alt="홈 화면" width="220" />
-
-이미지를 docs/images 폴더에 업로드한 뒤
-아래 [이미지 추가 예정] 부분을 img 태그로 교체하세요.
--->
 
 | 홈 화면 | 모음집 화면 | 검색 화면 |
 | :---: | :---: | :---: |
@@ -417,9 +408,7 @@ npm start
 
 ### 발표자료 또는 포스터
 
-- **자료명:** [작성 예정]
-- **형식:** PDF
-- **자료 링크:** [PDF 링크 입력]
+<img width="1005" height="1565" alt="북향_포스터_최종1" src="https://github.com/user-attachments/assets/4469da01-c123-4418-bd1f-b9c47dfd8de3" />
 
 ### 프로젝트 결과보고서
 
@@ -429,21 +418,9 @@ npm start
 
 ### 시연 영상
 
-- **영상 제목:** [작성 예정]
-- **영상 플랫폼:** [YouTube 등]
-- **영상 링크:** [외부 접속 가능한 링크]
-
-<!--
-GitHub에 파일을 업로드한 경우
-상대 경로를 사용하여 링크를 연결할 수 있습니다.
-
-예시:
-[발표자료](./docs/presentation.pdf)
-[결과보고서](./docs/final-report.pdf)
-
-PDF 파일은 실제 업로드한 경로와
-파일명에 맞게 수정해야 합니다.
--->
+- **영상 제목:** [졸업 작품] 소프트웨어학과 김지량, 이재웅 [북향] 시연 영상
+- **영상 플랫폼:** YouTube
+- **영상 링크:** https://www.youtube.com/watch?v=95OgwXLXFTY
 
 ---
 
