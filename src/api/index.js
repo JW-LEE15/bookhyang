@@ -455,4 +455,17 @@ export const updateNickname = async (nickname) => {
   return response.data;
 };
 
+// 9. 프로필 사진 등록/변경 API (PUT /api/auth/profile-image, 로그인 필요)
+// base64는 data: 접두사 없는 순수 base64 문자열. 성공 시 { success, user }를 돌려준다.
+export const updateProfileImage = async (base64) => {
+  const response = await api.put('/auth/profile-image', { image: base64 });
+  return response.data;
+};
+
+// 10. 프로필 사진 삭제 API (DELETE /api/auth/profile-image, 로그인 필요)
+export const deleteProfileImage = async () => {
+  const response = await api.delete('/auth/profile-image');
+  return response.data;
+};
+
 export default api;
