@@ -55,15 +55,9 @@
 
 ### 대표 시연 화면
 
-<!-- 이미지 업로드 후 아래 주석을 해제하세요.
-
 <p align="center">
-  <img src="./docs/images/bookhyang-preview.png" alt="북향 앱 대표 시연 화면" width="100%" />
+  <img src="./assets/icon.png" alt="북향 앱 대표 시연 화면" width="100%" />
 </p>
-
--->
-
-[대표 시연 이미지 또는 GIF 추가 예정]
 
 ### 주요 화면
 
@@ -78,22 +72,22 @@
 
 | 홈 화면 | 모음집 화면 | 검색 화면 |
 | :---: | :---: | :---: |
-| <img src="./assets/홈화면1.png" alt="홈 화면" width="220" /> | [이미지 추가 예정] | [이미지 추가 예정] |
+| <img src="./assets/홈화면1.png" alt="홈 화면" width="220" /> | <img src="./assets/모음집화면.png" alt="모음집 화면" width="220" /> | <img src="./assets/독서검색화면.png" alt="검색 화면" width="220" /> |
 | [설명 작성] | [설명 작성] | [설명 작성] |
 
 | 책 상세 화면 | 책별 댓글 화면 | 로그인 화면 |
 | :---: | :---: | :---: |
-| [이미지 추가 예정] | [이미지 추가 예정] | [이미지 추가 예정] |
+| <img src="./assets/도서상세화면.png" alt="책 상세 화면" width="220" /> | <img src="./assets/책별댓글.png" alt="책별 댓글 화면" width="220" /> | <img src="./assets/로그인.png" alt="로그인 화면" width="220" /> |
 | [설명 작성] | [설명 작성] | [설명 작성] |
 
 | MY 화면 | 설정 화면 | 공통 UI |
 | :---: | :---: | :---: |
-| [이미지 추가 예정] | [이미지 추가 예정] | [이미지 추가 예정] |
+| <img src="./assets/MY화면.png" alt="MY 화면" width="220" /> | <img src="./assets/설정화면.png" alt="설정 화면" width="220" /> | <img src="./assets/공통UI.png" alt="공통 UI" width="220" /> |
 | [설명 작성] | [설명 작성] | [설명 작성] |
 
 | AI 댓글 요약 | AI 독서 추천 | 추천 결과 |
 | :---: | :---: | :---: |
-| [이미지 추가 예정] | [이미지 추가 예정] | [이미지 추가 예정] |
+| <img src="./assets/AI댓글요약.png" alt="AI 댓글 요약" width="220" /> | <img src="./assets/AI독서추천.png" alt="AI 독서 추천" width="220" /> | <img src="./assets/추천결과.png" alt="추천 결과" width="220" /> |
 | [설명 작성] | [설명 작성] | [설명 작성] |
 
 ### 화면별 시연 내용
