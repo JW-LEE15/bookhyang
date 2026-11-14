@@ -14,6 +14,7 @@ import { COLORS } from '../constants/theme';
 import { getUserBooksSummary } from '../api';
 import { AuthContext } from '../context/AuthContext'; // 👈 AuthContext 불러오기
 import BookCover, { toHttps } from '../components/BookCover';
+import UserAvatar from '../components/UserAvatar';
 import { getRecentBooks } from '../storage/recentBooksStorage';
 import { recentToDetailBook } from '../utils/bookShape';
 import { normalizeReadEndDate } from '../utils/readEndDate';
@@ -124,11 +125,21 @@ export default function MyScreen({ navigation }) {
 
         {/* 프로필 카드 */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>
-              {user?.nickname ? user.nickname.substring(0, 1) : '책'}
-            </Text>
-          </View>
+          <TouchableOpacity
+            style={styles.avatarButton}
+            onPress={() => navigation.navigate('EditProfile')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="프로필 편집"
+          >
+            <UserAvatar uri={user?.profile_image_url} size={54}>
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarText}>
+                  {user?.nickname ? user.nickname.substring(0, 1) : '책'}
+                </Text>
+              </View>
+            </UserAvatar>
+          </TouchableOpacity>
           <Text style={styles.profileName}>{user?.nickname || '북향 수집가'}</Text>
           <Text style={styles.profileSub}>민음사 서재를 차곡차곡 채우는 중입니다</Text>
 
@@ -276,8 +287,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#5C3D2E',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
   },
+  avatarButton: { marginBottom: 10 },
   avatarText: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
   profileName: { fontSize: 18, fontWeight: 'bold', color: '#2B2118' },
   profileSub: { fontSize: 12, color: '#8C827A', marginTop: 4, textAlign: 'center' },

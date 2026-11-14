@@ -74,7 +74,7 @@ export default function MainStackNavigator() {
           <Stack.Screen
             name="EditProfile"
             component={EditProfileScreen}
-            options={{ headerShown: true, title: '닉네임 변경' }}
+            options={{ headerShown: true, title: '프로필 편집' }}
           />
           <Stack.Screen
             name="Terms"

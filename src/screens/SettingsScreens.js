@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { COLORS } from '../constants/theme';
 import { AuthContext } from '../context/AuthContext';
+import UserAvatar from '../components/UserAvatar';
 import {
   SETTING_KEYS,
   loadBooleanSettings,
@@ -79,6 +80,7 @@ export default function SettingsScreen({ navigation }) {
             activeOpacity={0.7}
             accessibilityRole="button"
           >
+            <UserAvatar uri={user?.profile_image_url} size={28} style={styles.rowAvatar} />
             <Text style={styles.rowLabel}>닉네임</Text>
             <Text style={styles.rowValue} numberOfLines={1}>{user?.nickname || '-'}</Text>
             <Text style={styles.chevron}>›</Text>
@@ -171,6 +173,7 @@ export default function SettingsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  rowAvatar: { marginRight: 10 },
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { padding: 20, paddingBottom: 40 },
   screenTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 8 },

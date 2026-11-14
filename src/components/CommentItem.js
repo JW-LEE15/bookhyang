@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { COLORS } from '../constants/theme';
 import { formatTimeAgo } from '../utils/timeAgo';
+import UserAvatar from './UserAvatar';
 
 const DELETED_TEXT = '삭제된 댓글입니다';
 const SPOILER_TEXT = '스포일러가 포함된 댓글입니다 · 눌러서 보기';
@@ -75,6 +76,7 @@ export default function CommentItem({
     <View style={[styles.container, isReply && styles.replyContainer]}>
       {isDeleted ? null : (
         <View style={styles.header}>
+          <UserAvatar uri={comment.profile_image_url} size={22} />
           <Text style={styles.nickname} numberOfLines={1}>{comment.nickname || '알 수 없음'}</Text>
           {isHiddenMine ? (
             <View style={styles.badge}>
