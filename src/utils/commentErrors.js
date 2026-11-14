@@ -13,3 +13,18 @@ export const getCommentErrorCode = (error) => error?.response?.data?.code;
 
 export const getCommentErrorMessage = (error) =>
   COMMENT_ERROR_MESSAGES[getCommentErrorCode(error)] || DEFAULT_COMMENT_ERROR;
+
+// 공감 실패 안내문 (429는 기본 문구와 같다)
+export const LIKE_OWN_COMMENT_TEXT = '내 댓글에는 공감할 수 없어요';
+export const getLikeErrorMessage = (error) =>
+  getCommentErrorCode(error) === 'LIKE_OWN_COMMENT' ? LIKE_OWN_COMMENT_TEXT : DEFAULT_COMMENT_ERROR;
+
+// 신고 결과 안내문
+export const REPORT_SUCCESS_TEXT = '신고가 접수되었어요';
+export const ALREADY_REPORTED_TEXT = '이미 신고한 댓글이에요';
+export const isAlreadyReported = (error) =>
+  getCommentErrorCode(error) === 'ALREADY_REPORTED' || error?.response?.status === 409;
+export const getReportErrorMessage = (error) =>
+  error?.response?.status === 400 && getCommentErrorCode(error) === 'VALIDATION_ERROR'
+    ? COMMENT_ERROR_MESSAGES.VALIDATION_ERROR
+    : DEFAULT_COMMENT_ERROR;
