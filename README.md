@@ -418,7 +418,8 @@ npm start
 
 - **자료명:** 북향_프로젝트_최종결과보고서
 - **형식:** PDF
-- **자료 링크:** [북향_프로젝트_최종결과보고서.pdf](https://github.com/user-attachments/files/34867041/_._.pdf)
+- **자료 링크:** [북향_프로젝트_최종결과보고서.pdf](https://github.com/user-attachments/files/34877816/_._.pdf)
+
 
 
 ### 시연 영상
