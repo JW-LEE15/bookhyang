@@ -53,7 +53,7 @@
 
 ## 2. 시연 화면
 
-### 대표 시연 화면
+### 대표 아이콘
 
 <p align="center">
   <img src="./assets/icon.png" alt="북향 앱 대표 시연 화면" width="50%" />
