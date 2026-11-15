@@ -176,7 +176,7 @@
 | Authentication | 이메일/비밀번호 가입·로그인, bcrypt, JWT (만료 7일), 토큰은 expo-secure-store에 저장 |
 | External API | 카카오 도서 검색 API, Google Gemini API (AI 기능 개발 중) |
 | Deployment / Build | Render (백엔드), EAS Build (안드로이드 APK, preview 프로필) |
-| Design / Collaboration | GitHub |
+| Design / Collaboration | GitHub + notion |
 
 ---
 
