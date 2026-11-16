@@ -319,6 +319,9 @@ bookhyang/
 
 ## 8. 설치 및 실행 방법
 
+### 설치 QR코드
+<img width="317" height="289" alt="qr콛" src="https://github.com/user-attachments/assets/9e7d98ed-c591-4a52-8ed2-a69b6cca76e5" />
+
 ### 사전 요구 사항
 
 - Node.js 24.x (개발·테스트 환경, 백엔드는 22 이상 25 미만)
