@@ -322,6 +322,9 @@ bookhyang/
 ### 설치 QR코드
 <img width="317" height="289" alt="qr콛" src="https://github.com/user-attachments/assets/9e7d98ed-c591-4a52-8ed2-a69b6cca76e5" />
 
+### 다운로드 링크
+https://expo.dev/accounts/jaewoong02/projects/bookhyang/builds/cac4014d-e008-4952-9658-d3235f4a5fd9
+
 ### 사전 요구 사항
 
 - Node.js 24.x (개발·테스트 환경, 백엔드는 22 이상 25 미만)
