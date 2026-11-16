@@ -174,7 +174,7 @@
 | Database | Supabase (PostgreSQL), `pg`로 직접 연결 |
 | Navigation / State | React Navigation (하단 탭 + 스택), React Context (AuthContext), AsyncStorage |
 | Authentication | 이메일/비밀번호 가입·로그인, bcrypt, JWT (만료 7일), 토큰은 expo-secure-store에 저장 |
-| External API | 카카오 도서 검색 API, Google Gemini API (AI 기능 개발 중) |
+| External API | 카카오 도서 검색 API, Google Gemini API |
 | Deployment / Build | Render (백엔드), EAS Build (안드로이드 APK, preview 프로필) |
 | Design / Collaboration | GitHub + notion |
 
@@ -192,9 +192,10 @@
 
 | 구분 | 연동 대상 / 역할 |
 | --- | --- |
-| 앱 ↔ 백엔드 | 앱이 axios로 `https://<서버주소>/api`의 REST API(`/auth`, `/books/search`, `/user-books`, `/comments`)를 호출. 로그인 후에는 JWT를 `Authorization: Bearer` 헤더로 전달하며, 도서 검색과 댓글 조회는 로그인 없이 호출 가능 |
-| 백엔드 ↔ Supabase | 백엔드가 `pg` 커넥션 풀로 Supabase PostgreSQL에 직접 연결해 회원, 서재, 댓글 데이터를 저장·조회 |
-| 백엔드 ↔ 카카오 도서 API | 백엔드가 카카오 도서 검색 API를 호출하고 출판사에 '민음사'가 포함된 결과만 앱에 전달 (앱은 카카오 API를 직접 호출하지 않음) |
+| 앱 ↔ 백엔드 | 앱이 axios로 `https://<서버주소>/api`의 REST API(`/auth`, `/books`, `/user-books`, `/comments`, `/ai`, `/reading-reports`, `/users`)를 호출. 로그인 후에는 JWT를 `Authorization: Bearer` 헤더로 전달. 서버는 모음집·도서 검색·댓글 조회를 로그인 없이도 제공하지만 앱은 로그인 후에 이용 |
+| 백엔드 ↔ Supabase | 백엔드가 pg 커넥션 풀로 Supabase PostgreSQL에 직접 연결해 회원, 모음집 도서, 서재·독서 메모, 댓글(답글·하트·신고), AI 독서 리포트, 프로필 사진을 저장·조회 |
+| 백엔드 ↔ 카카오 도서 API | 도서 검색(출판사에 '민음사'가 포함된 결과만 전달)과 도서 소개글 실시간 조회(저장하지 않음). 앱은 카카오 API를 직접 호출하지 않음 |
+| 백엔드 ↔ Google Gemini API | AI 추천·댓글 요약·독서 리포트 생성. 서버에서만 호출하며 호출 한도와 대체 모델 전환을 적용 |
 
 ### 시스템 흐름
 
@@ -202,10 +203,12 @@
 앱 (React Native / Expo)
 └── Render 서버 (Express, https://<서버주소>/api)
     ├── Supabase DB (PostgreSQL)
-    │   └── 회원, 서재, 댓글 데이터 저장·조회
+    │   └── 회원, 모음집 도서, 서재·독서 메모, 댓글(답글·하트·신고),
+    │       AI 독서 리포트, 프로필 사진 저장·조회
     ├── 카카오 도서 API
-    │   └── 민음사 도서 검색
-    └── AI 호출 (Google Gemini API): 개발 중
+    │   └── 민음사 도서 검색, 도서 소개글 실시간 조회(저장하지 않음)
+    └── Google Gemini API
+        └── AI 추천·댓글 요약·독서 리포트 생성 (서버에서만 호출)
 ```
 
 ---
@@ -238,9 +241,9 @@ bookhyang/
 
 | 디렉터리 | 설명 |
 | --- | --- |
-| src/ | 앱 소스 코드. `api`(서버 요청과 로그인 토큰 처리), `components`(댓글 미리보기, 댓글 항목, 키보드 대응 컨테이너), `constants`(테마 값, 이용약관·개인정보 처리방침 초안 문구), `context`(로그인 상태를 담은 AuthContext), `hooks`(안드로이드 키보드 여백 계산), `navigation`(하단 탭과 스택 화면 구성), `storage`(기기에 설정값 저장), `utils`(ISBN 변환, 작성 시간 표시) |
-| src/screens/ | 화면 컴포넌트. 홈, 모음집, 검색, 책 상세, 책별 댓글, 로그인, 회원가입, MY, 설정, 이용약관·개인정보 처리방침 화면 |
-| assets/ | 앱 아이콘, 적응형 아이콘, 스플래시, 파비콘 이미지 |
+| `src/` | 앱 소스 코드. api(서버 요청과 로그인 토큰 처리), components(책 표지·소개글·관련 책, 독서 기록·완독일·메모, 댓글 항목·미리보기·신고 모달, 프로필 아바타, 키보드 대응 컨테이너), constants(테마 값, AI 취향 선택지, 이용약관·개인정보 처리방침 문구), context(로그인 상태를 담은 AuthContext), hooks(안드로이드 키보드 여백 계산), navigation(하단 탭과 스택 화면 구성), storage(기기에 설정값·AI 취향 선택·최근 본 책 저장), utils(ISBN 변환, 작성 시간 표시, 완독일 검증, 도서 정보 변환, 프로필 이미지 주소, 오류 문구) |
+| `src/screens/` | 화면 컴포넌트. 홈, 모음집, 검색, 책 상세, 책별 댓글, 로그인, 회원가입, MY, 내 서재, 프로필 편집, 설정, 이용약관·개인정보 처리방침, AI 취향 선택·추천 결과·댓글 요약·독서 리포트 화면 |
+| `assets/` | 앱 아이콘, 적응형 아이콘, 스플래시, 파비콘 이미지, 화면 캡처 이미지와 아키텍처 다이어그램 |
 
 ---
 
